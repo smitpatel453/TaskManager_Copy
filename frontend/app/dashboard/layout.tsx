@@ -18,7 +18,13 @@ export default function DashboardLayout({
     if (user) {
       try {
         const userData = JSON.parse(user);
-        setUserRole(userData.role);
+        // Validate role is one of the allowed values
+        if (userData.role === "admin" || userData.role === "user") {
+          setUserRole(userData.role);
+        } else {
+          console.warn("Invalid role in user data:", userData.role);
+          setUserRole("user");
+        }
       } catch (error) {
         console.error("Error parsing user data:", error);
       }

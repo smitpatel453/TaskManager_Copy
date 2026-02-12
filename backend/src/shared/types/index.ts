@@ -69,9 +69,9 @@ export interface GetTasksResponse {
 }
 
 export interface TaskDetailsResponse {
-  ok: boolean;
+  success: boolean;
   details: DetailBlock[];
-  message?: string;
+  message: string;
 }
 // ============ Project Types ============
 export interface CreateProjectRequest {

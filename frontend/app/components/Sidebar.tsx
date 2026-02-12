@@ -143,7 +143,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
         closePasswordModal();
       }, 2000);
     } catch (error) {
-      console.error("Password change error:", error);
+      console.error(\"Password change error:\", error?.message || String(error));
       setPasswordError(getApiErrorMessage(error, "Failed to change password"));
     } finally {
       setIsPasswordLoading(false);

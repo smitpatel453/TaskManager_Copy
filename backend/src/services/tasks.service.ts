@@ -4,7 +4,15 @@ import type { CreateTaskRequest, DetailBlock, TaskStatus } from "../shared/types
 
 function isValidTimeHHMM(value: unknown): value is string {
   if (typeof value !== "string") return false;
-  return /^\d{2}:\d{2}$/.test(value);
+  const match = /^(\d{2}):(\d{2})$/.test(value);
+  if (!match) return false;
+  
+  // Parse and validate ranges
+  const parts = value.split(":");
+  const hours = parseInt(parts[0], 10);
+  const minutes = parseInt(parts[1], 10);
+  
+  return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
 }
 
 function parseDate(value: unknown): Date | null {
@@ -215,6 +223,11 @@ export class TasksService {
   }
 
   async updateTaskDetail(taskId: string, detailIndex: number, updatedDetail: { text: string; time: string }, userId: string): Promise<any> {
+    // Validate taskId format
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      throw new Error("Invalid task ID");
+    }
+
     // Validate inputs
     if (typeof detailIndex !== "number" || detailIndex < 0) {
       throw new Error("Invalid detail index");
@@ -247,6 +260,11 @@ export class TasksService {
   async updateTaskStatus(taskId: string, status: TaskStatus, userId: string): Promise<any> {
     if (!mongoose.Types.ObjectId.isValid(taskId)) {
       throw new Error("Invalid task ID");
+    }
+
+    // Validate status
+    if (!isValidStatus(status)) {
+      throw new Error("Invalid task status");
     }
 
     const isAdmin = await this.isUserAdmin(userId);

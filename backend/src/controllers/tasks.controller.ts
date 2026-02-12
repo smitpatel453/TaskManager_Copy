@@ -82,7 +82,13 @@ export class TasksController {
 
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
-      const filter = (req.query.filter as string) || "all"; // all, created, assigned
+      const allowedFilters = ["all", "created", "assigned"];
+      let filter = (req.query.filter as string) || "all";
+      
+      if (!allowedFilters.includes(filter)) {
+        res.status(400).json({ error: "Invalid filter. Must be one of: all, created, assigned" });
+        return;
+      }
 
       const result = await this.tasksService.getTasks(userId, page, limit, filter);
       res.json(result);
@@ -130,7 +136,7 @@ export class TasksController {
       }
 
       const detailIndex = parseInt(index, 10);
-      if (Number.isNaN(detailIndex)) {
+      if (Number.isNaN(detailIndex) || detailIndex < 0) {
         res.status(400).json({ error: "Invalid detail index" });
         return;
       }

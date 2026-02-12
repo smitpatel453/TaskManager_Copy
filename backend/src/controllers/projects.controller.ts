@@ -40,6 +40,12 @@ export class ProjectsController {
                 return;
             }
 
+            // Validate each user ID is a non-empty string
+            if (!body.assignedUsers.every(u => typeof u === 'string' && u.trim().length > 0)) {
+                res.status(400).json({ error: "assignedUsers must be an array of non-empty string user IDs" });
+                return;
+            }
+
             const result = await this.projectsService.createProject(body as CreateProjectRequest, userId);
             res.status(201).json(result);
         } catch (error) {

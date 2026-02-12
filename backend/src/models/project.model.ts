@@ -65,6 +65,9 @@ export class ProjectModel {
      * Find projects by assigned user ID
      */
     async findByAssignedUser(userId: string): Promise<ProjectDocument[]> {
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            throw new Error("Invalid userId format");
+        }
         return this.model
             .find({ assignedUsers: new mongoose.Types.ObjectId(userId) })
             .populate("assignedUsers", "firstName lastName email")
@@ -76,7 +79,9 @@ export class ProjectModel {
      * Update a project
      */
     async update(projectId: string, updateData: Partial<Omit<ProjectDocument, "_id" | "createdAt" | "updatedAt" | keyof Document>>): Promise<ProjectDocument | null> {
-        return this.model.findByIdAndUpdate(projectId, updateData, { new: true }).populate("assignedUsers", "firstName lastName email");
+        return this.model.findByIdAndUpdate(projectId, updateData, { new: true, runValidators: true })
+            .populate("assignedUsers", "firstName lastName email")
+            .populate("createdBy", "firstName lastName email");
     }
 
     /**

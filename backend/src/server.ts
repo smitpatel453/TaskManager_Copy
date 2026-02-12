@@ -11,7 +11,6 @@ connectDB()
 
     app.listen(ENV.PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on http://0.0.0.0:${ENV.PORT}`);
-      console.log(`🌐 Access from network: http://192.168.2.200:${ENV.PORT}`);
       console.log(`📝 Environment: ${ENV.NODE_ENV}`);
     });
   })

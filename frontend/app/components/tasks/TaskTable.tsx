@@ -370,6 +370,13 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId }: TaskRowProps) {
       return;
     }
 
+    // Validate time ranges
+    const [hours, minutes] = editTime.split(":").map(Number);
+    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+      setEditError("Time must be in HH:MM format and a valid time");
+      return;
+    }
+
     setEditLoading(true);
     try {
       await tasksApi.updateTaskDetail(

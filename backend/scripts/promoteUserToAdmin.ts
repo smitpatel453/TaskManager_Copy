@@ -2,27 +2,21 @@ import mongoose from "mongoose";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import dotenv from "dotenv";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Load environment variables
 const envPath = path.resolve(__dirname, "../.env");
 if (fs.existsSync(envPath)) {
-  const envContent = fs.readFileSync(envPath, "utf-8");
-  envContent.split("\n").forEach((line) => {
-    const [key, value] = line.split("=");
-    if (key && value) {
-      process.env[key.trim()] = value.trim();
-    }
-  });
+  dotenv.config({ path: envPath });
 }
 
 async function promoteUserToAdmin() {
   try {
     console.log("Connecting to MongoDB...");
-    const mongoUri = process.env.MONGODB_URI || "mongodb://localhost:27017/";
-    const dbName = process.env.DB_NAME || "mydb";
-    await mongoose.connect(mongoUri + dbName);
+    const mongoUri = process.env.MONGODB_URI || "mongodb://localhost:27017/mydb";
+    await mongoose.connect(mongoUri);
     console.log("✓ Connected to MongoDB");
 
     const db = mongoose.connection.db;
@@ -95,6 +89,7 @@ async function promoteUserToAdmin() {
     await mongoose.connection.close();
   } catch (error) {
     console.error("✗ Error:", error instanceof Error ? error.message : String(error));
+    await mongoose.connection.close();
     process.exit(1);
   }
 }

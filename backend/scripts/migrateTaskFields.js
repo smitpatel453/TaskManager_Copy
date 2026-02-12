@@ -100,7 +100,7 @@ async function migrateTaskFields() {
     console.log("\n✓ Migration completed successfully!");
   } catch (error) {
     console.error("✗ Migration failed:", error.message);
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
     await mongoose.connection.close();
     console.log("Database connection closed");

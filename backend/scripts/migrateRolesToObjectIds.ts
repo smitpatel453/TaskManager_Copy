@@ -2,27 +2,21 @@ import mongoose from "mongoose";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import dotenv from "dotenv";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Load environment variables
-const envPath = path.resolve(__dirname, "../.env.local");
+const envPath = path.resolve(__dirname, "../. env.local");
 if (fs.existsSync(envPath)) {
-  const envContent = fs.readFileSync(envPath, "utf-8");
-  envContent.split("\n").forEach((line) => {
-    const [key, value] = line.split("=");
-    if (key && value) {
-      process.env[key.trim()] = value.trim();
-    }
-  });
+  dotenv.config({ path: envPath });
 }
 
 async function migrateRolesToObjectIds() {
   try {
     console.log("Connecting to MongoDB...");
-    const mongoUri = process.env.MONGODB_URI || "mongodb://localhost:27017/";
-    const dbName = process.env.DB_NAME || "mydb";
-    await mongoose.connect(mongoUri + dbName);
+    const mongoUri = process.env.MONGODB_URI || "mongodb://localhost:27017/mydb";
+    await mongoose.connect(mongoUri);
     console.log("✓ Connected to MongoDB");
 
     const db = mongoose.connection.db;
@@ -53,10 +47,8 @@ async function migrateRolesToObjectIds() {
       return;
     }
 
-    console.log(`\nFound ${adminUsers.length} user(s) with string 'admin' role:`);
-    adminUsers.forEach((user) => {
-      console.log(`  - ${user.firstName} ${user.lastName} (${user.email})`);
-    });
+    console.log(`\nFound ${adminUsers.length} user(s) with string 'admin' role`);
+    // Only log user count to avoid PII
 
     // Update all users with string "admin" role to use ObjectId
     const result = await usersCollection.updateMany(
@@ -73,6 +65,7 @@ async function migrateRolesToObjectIds() {
     await mongoose.connection.close();
   } catch (error) {
     console.error("✗ Error:", error instanceof Error ? error.message : String(error));
+    await mongoose.connection.close();
     process.exit(1);
   }
 }

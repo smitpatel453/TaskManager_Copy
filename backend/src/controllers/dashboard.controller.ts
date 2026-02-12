@@ -4,8 +4,9 @@ import { DashboardService } from "../services/dashboard.service.js";
 export class DashboardController {
   private dashboardService: DashboardService;
 
-  constructor() {
-    this.dashboardService = new DashboardService();
+  constructor(dashboardService?: DashboardService) {
+    this.dashboardService = dashboardService || new DashboardService();
+    this.getStats = this.getStats.bind(this);
   }
 
   async getStats(req: Request, res: Response): Promise<void> {

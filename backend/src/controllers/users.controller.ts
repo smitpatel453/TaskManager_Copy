@@ -2,6 +2,23 @@ import { Request, Response } from "express";
 import { UsersService } from "../services/users.service.js";
 import type { CreateUserRequest } from "../shared/types/index.js";
 
+// Helper function to validate password strength
+function isStrongPassword(password: string): boolean {
+    // At least 8 characters, 1 uppercase, 1 lowercase, 1 digit, 1 special char
+    const hasLength = password.length >= 8;
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasLowercase = /[a-z]/.test(password);
+    const hasDigit = /\d/.test(password);
+    const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+    return hasLength && hasUppercase && hasLowercase && hasDigit && hasSpecial;
+}
+
+// Helper function to validate email format
+function isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
+
 export class UsersController {
     private usersService: UsersService;
 
@@ -38,8 +55,18 @@ export class UsersController {
                 return;
             }
 
+            if (!isValidEmail(body.email)) {
+                res.status(400).json({ error: "email must be a valid email address" });
+                return;
+            }
+
             if (!body.password || typeof body.password !== "string") {
                 res.status(400).json({ error: "password is required and must be a string" });
+                return;
+            }
+
+            if (!isStrongPassword(body.password)) {
+                res.status(400).json({ error: "password must be at least 8 characters and include uppercase, lowercase, number, and special character" });
                 return;
             }
 
@@ -75,8 +102,12 @@ export class UsersController {
                 return;
             }
 
-            const page = parseInt(req.query.page as string) || 1;
-            const limit = parseInt(req.query.limit as string) || 10;
+            let page = parseInt(req.query.page as string) || 1;
+            let limit = parseInt(req.query.limit as string) || 10;
+            
+            // Validate and coerce pagination values
+            page = Math.max(1, page);
+            limit = Math.max(1, Math.min(limit, 100)); // Clamp between 1 and 100
 
             const result = await this.usersService.getAllUsers(adminId, page, limit);
             res.json(result);

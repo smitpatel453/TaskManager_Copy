@@ -323,6 +323,11 @@ export class TaskModel {
             return null;
         }
 
+        // Validate updatedDetail
+        if (!updatedDetail || typeof updatedDetail !== 'object' || typeof updatedDetail.text !== 'string' || updatedDetail.text.trim().length === 0) {
+            return null;
+        }
+
         let task: TaskDocument | null;
         if (isAdmin) {
             // Admins can update any task

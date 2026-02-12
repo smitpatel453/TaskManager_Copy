@@ -29,12 +29,16 @@
 ## Access Your Application
 
 ### From Your Computer:
-- Frontend: http://localhost:3000 or http://192.168.2.200:3000
-- Backend: http://localhost:3001/api or http://192.168.2.200:3001/api
+- Frontend: http://localhost:3000
+- Backend: http://localhost:3001/api
 
 ### From Other Devices on Your Network:
-- Frontend: http://192.168.2.200:3000
-- Backend: http://192.168.2.200:3001/api
+- Frontend: http://YOUR_SERVER_IP:3000
+- Backend: http://YOUR_SERVER_IP:3001/api
+
+**To find your IP:**
+- Windows: Run `ipconfig` in Command Prompt and look for "IPv4 Address"
+- Linux/Mac: Run `ifconfig` or `ip a` and look for your network IP address
 
 **Note:** Make sure your firewall allows incoming connections on ports 3000 and 3001.
 
@@ -107,9 +111,9 @@ PM2 will output a command specific to your system, like:
 
 **Windows:**
 ```powershell
-# this works in linux 
 pm2 startup
 ```
+Follow the instructions provided by PM2 to complete the setup.
 
 **Linux/macOS:**
 ```bash
@@ -153,7 +157,7 @@ This saves the current process list so PM2 knows what to restart after boot.
 # Windows - Allow ports
 New-NetFirewallRule -DisplayName "TaskManager Frontend" -Direction Inbound -LocalPort 3000 -Protocol TCP -Action Allow
 New-NetFirewallRule -DisplayName "TaskManager Backend" -Direction Inbound -LocalPort 3001 -Protocol TCP -Action Allow
-# verifing check
+# Verification check
 Get-NetFirewallRule -DisplayName "TaskManager*" 
 
 # Linux

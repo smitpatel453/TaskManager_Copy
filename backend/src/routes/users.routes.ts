@@ -24,6 +24,11 @@ async function adminMiddleware(req: Request, res: Response, next: NextFunction):
         }
 
         // Find user and check role
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            res.status(400).json({ error: "Invalid user ID" });
+            return;
+        }
+        
         const user = await db.collection("users").findOne({ _id: new mongoose.Types.ObjectId(userId) });
         if (!user) {
             res.status(404).json({ error: "User not found" });
@@ -53,8 +58,26 @@ async function adminMiddleware(req: Request, res: Response, next: NextFunction):
 router.use(authMiddleware);
 
 // Admin only routes
-router.post("/", adminMiddleware, (req, res) => usersController.createUser(req, res));
-router.get("/", adminMiddleware, (req, res) => usersController.getAllUsers(req, res));
-router.delete("/:id", adminMiddleware, (req, res) => usersController.deleteUser(req, res));
+router.post("/", adminMiddleware, async (req, res, next) => {
+    try {
+        await usersController.createUser(req, res);
+    } catch (error) {
+        next(error);
+    }
+});
+router.get("/", adminMiddleware, async (req, res, next) => {
+    try {
+        await usersController.getAllUsers(req, res);
+    } catch (error) {
+        next(error);
+    }
+});
+router.delete("/:id", adminMiddleware, async (req, res, next) => {
+    try {
+        await usersController.deleteUser(req, res);
+    } catch (error) {
+        next(error);
+    }
+});
 
 export default router;

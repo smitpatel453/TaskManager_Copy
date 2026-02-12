@@ -57,7 +57,16 @@ export default function AddUserForm({ onSuccess }: AddUserFormProps) {
       return;
     }
 
-    createUserMutation.mutate(formData);
+    // Create payload with trimmed values
+    const payload: CreateUserRequest = {
+      firstName: formData.firstName.trim(),
+      lastName: formData.lastName.trim(),
+      email: formData.email.trim(),
+      password: formData.password,
+      role: formData.role,
+    };
+
+    createUserMutation.mutate(payload);
   };
 
   return (
@@ -70,10 +79,11 @@ export default function AddUserForm({ onSuccess }: AddUserFormProps) {
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
             First Name
           </label>
           <input
+            id="firstName"
             type="text"
             value={formData.firstName}
             onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
@@ -83,10 +93,11 @@ export default function AddUserForm({ onSuccess }: AddUserFormProps) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
             Last Name
           </label>
           <input
+            id="lastName"
             type="text"
             value={formData.lastName}
             onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
@@ -97,10 +108,11 @@ export default function AddUserForm({ onSuccess }: AddUserFormProps) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
           Email
         </label>
         <input
+          id="email"
           type="email"
           value={formData.email}
           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -110,10 +122,11 @@ export default function AddUserForm({ onSuccess }: AddUserFormProps) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
           Password
         </label>
         <input
+          id="password"
           type="password"
           value={formData.password}
           onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -123,10 +136,11 @@ export default function AddUserForm({ onSuccess }: AddUserFormProps) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
           Role
         </label>
         <select
+          id="role"
           value={formData.role}
           onChange={(e) => setFormData({ ...formData, role: e.target.value as "admin" | "user" })}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"

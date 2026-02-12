@@ -22,7 +22,7 @@ out/
 *.swp
 *.swo
 *~
-.DS_Store
+
 
 # OS
 Thumbs.db
