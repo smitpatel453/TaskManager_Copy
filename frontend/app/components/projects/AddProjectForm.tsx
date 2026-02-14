@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { projectsApi } from "../../../src/api/projects.api";
 import type { CreateProjectRequest } from "../../../src/types/project";
@@ -12,12 +12,23 @@ interface AddProjectFormProps {
 
 export default function AddProjectForm({ users, onSuccess }: AddProjectFormProps) {
   const queryClient = useQueryClient();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [formData, setFormData] = useState<CreateProjectRequest>({
     projectName: "",
     projectDescription: "",
     assignedUsers: [],
   });
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        setCurrentUserId(user.id || user._id);
+      } catch { /* ignore */ }
+    }
+  }, []);
 
   const createProjectMutation = useMutation({
     mutationFn: projectsApi.createProject,
@@ -61,70 +72,95 @@ export default function AddProjectForm({ users, onSuccess }: AddProjectFormProps
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          {error}
+        <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3">
+          <p className="text-sm text-[var(--status-error)]">{error}</p>
         </div>
       )}
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
           Project Name
         </label>
         <input
           type="text"
           value={formData.projectName}
           onChange={(e) => setFormData({ ...formData, projectName: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="claude-input w-full"
           placeholder="Enter project name"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
           Project Description
         </label>
         <textarea
           value={formData.projectDescription}
           onChange={(e) => setFormData({ ...formData, projectDescription: e.target.value })}
           rows={3}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="claude-input w-full resize-none"
           placeholder="Enter project description"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
           Assign Users
         </label>
-        <div className="border border-gray-300 rounded-lg p-4 max-h-48 overflow-y-auto">
+        <div className="border border-[var(--border-subtle)] rounded-lg p-4 max-h-48 overflow-y-auto bg-[var(--bg-canvas)]">
           {users.length === 0 ? (
-            <p className="text-gray-500 text-sm">No users available</p>
+            <p className="text-[var(--text-muted)] text-sm">No users available</p>
           ) : (
             <div className="space-y-2">
-              {users.map((user) => (
-                <label key={user._id} className="flex items-center gap-2 cursor-pointer">
+              {users
+                .filter((user) => user._id !== currentUserId)
+                .map((user) => (
+                <label key={user._id} className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors">
                   <input
                     type="checkbox"
                     checked={formData.assignedUsers.includes(user._id)}
                     onChange={() => toggleUser(user._id)}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                    className="w-4 h-4 rounded border-[var(--border-subtle)] text-[var(--accent)] focus:ring-[var(--accent)] focus:ring-offset-0"
                   />
-                  <span className="text-sm text-gray-700">
-                    {user.fullName} ({user.email})
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] text-xs font-medium flex items-center justify-center">
+                      {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+                    </div>
+                    <span className="text-sm text-[var(--text-primary)]">
+                      {user.fullName}
+                    </span>
+                    <span className="text-xs text-[var(--text-muted)]">
+                      ({user.email})
+                    </span>
+                  </div>
                 </label>
               ))}
             </div>
           )}
         </div>
+        {formData.assignedUsers.length > 0 && (
+          <p className="text-xs text-[var(--text-tertiary)] mt-2">
+            {formData.assignedUsers.length} user{formData.assignedUsers.length !== 1 ? 's' : ''} selected
+          </p>
+        )}
       </div>
 
       <button
         type="submit"
         disabled={createProjectMutation.isPending}
-        className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+        className="claude-btn-primary w-full flex items-center justify-center gap-2"
       >
-        {createProjectMutation.isPending ? "Creating..." : "Create Project"}
+        {createProjectMutation.isPending ? (
+          <>
+            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            Creating...
+          </>
+        ) : (
+          "Create Project"
+        )}
       </button>
     </form>
   );

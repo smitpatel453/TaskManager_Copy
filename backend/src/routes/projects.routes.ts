@@ -59,9 +59,6 @@ router.get("/my-projects", (req, res) => projectsController.getUserProjects(req,
 // Admin only routes
 router.post("/", adminMiddleware, (req, res) => projectsController.createProject(req, res));
 router.get("/", adminMiddleware, (req, res) => projectsController.getAllProjects(req, res));
-router.get("/user/:userId", adminMiddleware, (req, res) => projectsController.getProjectsForUser(req, res));
-router.put("/:id", adminMiddleware, (req, res) => projectsController.updateProject(req, res));
-router.delete("/:id", adminMiddleware, (req, res) => projectsController.deleteProject(req, res));
 
 export default router;
 

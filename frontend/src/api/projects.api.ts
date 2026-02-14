@@ -25,22 +25,4 @@ export const projectsApi = {
     const response = await api.get("/projects/users/all");
     return response.data;
   },
-
-  // Get projects for a specific user (admin only)
-  getProjectsForUser: async (userId: string): Promise<ProjectsResponse> => {
-    const response = await api.get(`/projects/user/${userId}`);
-    return response.data;
-  },
-
-  // Update a project (admin only)
-  updateProject: async (projectId: string, data: Partial<CreateProjectRequest>) => {
-    const response = await api.put(`/projects/${projectId}`, data);
-    return response.data;
-  },
-
-  // Delete a project (admin only)
-  deleteProject: async (projectId: string) => {
-    const response = await api.delete(`/projects/${projectId}`);
-    return response.data;
-  },
 };

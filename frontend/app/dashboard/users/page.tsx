@@ -17,7 +17,7 @@ export default function UsersPage() {
         if (userData.role === "admin") {
           setIsAdmin(true);
         } else {
-          router.push("/dashboard");
+          router.push("/dashboard");  
         }
       } catch (error) {
         console.error("Error parsing user data:", error);

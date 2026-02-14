@@ -5,7 +5,7 @@ import type { CreateTaskRequest, DetailBlock, TaskStatus } from "../shared/types
 function isValidTimeHHMM(value: unknown): value is string {
   if (typeof value !== "string") return false;
   const match = value.match(/^(\d{2}):(\d{2})$/);
-  if (!match){return false;} 
+  if (!match) { return false; }
   const hours = parseInt(match[1], 10);
   const minutes = parseInt(match[2], 10);
   return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
@@ -67,6 +67,21 @@ export class TasksService {
     const assignedUser = await db.collection("users").findOne({ _id: new mongoose.Types.ObjectId(assignedToUser) });
     if (!assignedUser) {
       throw new Error("Assigned user not found");
+    }
+
+    // Check for admin privileges to determine assignment restrictions
+    const isAdmin = await this.isUserAdmin(userId);
+
+    // If admin, they cannot assign tasks to themselves
+    if (isAdmin) {
+      if (assignedToUser === userId) {
+        throw new Error("Admins cannot assign tasks to themselves");
+      }
+    } else {
+      // Regular users can only assign tasks to themselves
+      if (assignedToUser !== userId) {
+        throw new Error("You can only assign tasks to yourself");
+      }
     }
 
     // Check if task name already exists for this user
@@ -150,7 +165,7 @@ export class TasksService {
       items = result.items;
       total = result.total;
     } else {
-      // Regular users see tasks they created or tasks assigned to them (or filtered)
+      // Regular users see only tasks they created or tasks assigned to them
       const result = await this.taskModel.findPaginated(userId, validPage, validLimit, validFilter);
       items = result.items;
       total = result.total;
@@ -178,7 +193,7 @@ export class TasksService {
    */
   private async isUserAdmin(userId: string): Promise<boolean> {
     try {
-       if (!mongoose.Types.ObjectId.isValid(userId)) {return false;}
+      if (!mongoose.Types.ObjectId.isValid(userId)) { return false; }
       const db = mongoose.connection.db;
       if (!db) {
         return false;

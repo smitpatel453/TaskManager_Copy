@@ -99,7 +99,7 @@ export class TaskModel {
             matchCondition = { userId: userObjectId };
         } else if (filter === "assigned") {
             // Only tasks assigned to user by someone else (not self-created)
-            matchCondition = { 
+            matchCondition = {
                 assignedTo: userObjectId,
                 userId: { $ne: userObjectId }
             };
@@ -129,6 +129,14 @@ export class TaskModel {
                     }
                 },
                 {
+                    $lookup: {
+                        from: "users",
+                        localField: "assignedTo",
+                        foreignField: "_id",
+                        as: "assignedUserData"
+                    }
+                },
+                {
                     $project: {
                         _id: { $toString: "$_id" },
                         taskName: 1,
@@ -138,6 +146,13 @@ export class TaskModel {
                         projectId: { $toString: "$projectId" },
                         projectName: { $arrayElemAt: ["$projectData.projectName", 0] },
                         assignedTo: { $toString: "$assignedTo" },
+                        assignedToName: {
+                            $concat: [
+                                { $ifNull: [{ $arrayElemAt: ["$assignedUserData.firstName", 0] }, ""] },
+                                " ",
+                                { $ifNull: [{ $arrayElemAt: ["$assignedUserData.lastName", 0] }, ""] }
+                            ]
+                        },
                         startDate: 1,
                         dueDate: 1,
                         detailsCount: { $size: { $ifNull: ["$details", []] } },
@@ -171,7 +186,7 @@ export class TaskModel {
         } else if (userId && filter === "assigned") {
             // Only tasks assigned to admin by someone else (not self-created)
             const adminObjectId = new mongoose.Types.ObjectId(userId);
-            matchCondition = { 
+            matchCondition = {
                 assignedTo: adminObjectId,
                 userId: { $ne: adminObjectId }
             };
@@ -194,6 +209,14 @@ export class TaskModel {
                     }
                 },
                 {
+                    $lookup: {
+                        from: "users",
+                        localField: "assignedTo",
+                        foreignField: "_id",
+                        as: "assignedUserData"
+                    }
+                },
+                {
                     $project: {
                         _id: { $toString: "$_id" },
                         taskName: 1,
@@ -203,6 +226,13 @@ export class TaskModel {
                         projectId: { $toString: "$projectId" },
                         projectName: { $arrayElemAt: ["$projectData.projectName", 0] },
                         assignedTo: { $toString: "$assignedTo" },
+                        assignedToName: {
+                            $concat: [
+                                { $ifNull: [{ $arrayElemAt: ["$assignedUserData.firstName", 0] }, ""] },
+                                " ",
+                                { $ifNull: [{ $arrayElemAt: ["$assignedUserData.lastName", 0] }, ""] }
+                            ]
+                        },
                         startDate: 1,
                         dueDate: 1,
                         detailsCount: { $size: { $ifNull: ["$details", []] } },
@@ -227,12 +257,12 @@ export class TaskModel {
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return null;
         }
-        
+
         if (isAdmin) {
             // Admins can access any task
             return this.model.findOne({ _id: id });
         }
-        
+
         // Regular users can only access tasks they created or are assigned to
         const userObjectId = new mongoose.Types.ObjectId(userId);
         return this.model.findOne({

@@ -43,9 +43,7 @@ export default function LoginForm() {
     useEffect(() => {
         const token = localStorage.getItem("token");
         if (token) {
-            // Decode token to get user info (basic decode, not verification)
             try {
-                // Fetch user details or use stored user data
                 const storedUser = localStorage.getItem("user");
                 if (storedUser) {
                     setUser(JSON.parse(storedUser));
@@ -121,7 +119,6 @@ export default function LoginForm() {
         setPasswordError("");
         setPasswordSuccess("");
 
-        // Validation
         if (!passwordForm.currentPassword) {
             setPasswordError("Current password is required");
             return;
@@ -168,18 +165,15 @@ export default function LoginForm() {
         const formData = new FormData(e.currentTarget);
         const data = Object.fromEntries(formData.entries());
 
-        // Client-side validation
         const email = (data.email as string).trim();
         const password = (data.password as string);
 
-        // Email validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
             setError("Invalid email format");
             return;
         }
 
-        // Password validation
         if (password.length < 6) {
             setError("Password must be at least 6 characters");
             return;
@@ -189,10 +183,8 @@ export default function LoginForm() {
             setIsLoading(true);
             const result = await authApi.login(email, password);
 
-            // Store JWT token in localStorage
             localStorage.setItem("token", result.data.token);
 
-            // Use response data for user info
             const userData = {
                 firstName: result.data.firstName,
                 lastName: result.data.lastName,
@@ -200,7 +192,6 @@ export default function LoginForm() {
                 role: result.data.role,
             };
 
-            // Store user data
             localStorage.setItem("user", JSON.stringify(userData));
             setUser(userData);
             window.dispatchEvent(new CustomEvent("authStateChanged", { detail: { isLoggedIn: true } }));
@@ -217,141 +208,78 @@ export default function LoginForm() {
 
     return (
         <div>
-            {/* Show User Icon or Login Button */}
-            {user ? (
-                <div className="relative" ref={dropdownRef}>
-                    <button
-                        onClick={toggleDropdown}
-                        className="flex items-center gap-2 rounded-lg hover:bg-gray-100 p-2 transition-colors"
-                    >
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white font-semibold cursor-pointer">
-                            {user.firstName.charAt(0)}{user.lastName.charAt(0)}
-                        </div>
-                        <span className="text-gray-800 font-medium">
-                            {user.firstName} {user.lastName}
-                        </span>
-                        <svg
-                            className={`w-4 h-4 text-gray-600 transition-transform ${isDropdownOpen ? "rotate-180" : ""}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-
-                    {/* Dropdown Menu */}
-                    {isDropdownOpen && (
-                        <div className="absolute right-0 mt-2 w-48 rounded-lg bg-white shadow-lg border border-gray-200 py-1 z-50">
-                            <div className="px-4 py-2 border-b border-gray-100">
-                                <p className="text-sm font-medium text-gray-900 flex items-center gap-2">
-                                    {user.firstName} {user.lastName}
-                                    {user.role === "admin" && (
-                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
-                                            Admin
-                                        </span>
-                                    )}
-                                </p>
-                                <p className="text-xs text-gray-500 truncate">{user.email}</p>
-                            </div>
-                            <button
-                                onClick={openUpdatePasswordModal}
-                                className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 transition-colors flex items-center gap-2"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                                </svg>
-                                Update Password
-                            </button>
-                            <button
-                                onClick={handleLogout}
-                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                                </svg>
-                                Logout
-                            </button>
-                        </div>
-                    )}
+            {/* Error Message */}
+            {error && (
+                <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/20 p-3">
+                    <p className="text-sm text-[var(--status-error)]">{error}</p>
                 </div>
-            ) : (
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                        Email
+                    </label>
+                    <input
+                        type="email"
+                        name="email"
+                        id="email"
+                        placeholder="you@example.com"
+                        required
+                        className="claude-input w-full"
+                        aria-required
+                    />
+                </div>
+
+                <div>
+                    <label htmlFor="password" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                        Password
+                    </label>
+                    <input
+                        type="password"
+                        name="password"
+                        id="password"
+                        placeholder="Enter your password"
+                        required
+                        className="claude-input w-full"
+                        aria-required
+                    />
+                </div>
+
                 <button
-                    onClick={openModal}
-                    className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+                    type="submit"
+                    disabled={isLoading}
+                    className="claude-btn-primary w-full flex items-center justify-center gap-2"
                 >
-                    Login
+                    {isLoading ? (
+                        <>
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Signing in...
+                        </>
+                    ) : (
+                        "Sign In"
+                    )}
                 </button>
-            )}
-
-            {/* Modal */}
-            {isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                    <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-                        <h2 className="mb-4 text-xl font-bold text-gray-800">
-                            Login
-                        </h2>
-
-                        {error && (
-                            <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3">
-                                <p className="text-sm text-red-700">{error}</p>
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <input
-                                type="email"
-                                name="email"
-                                placeholder="Email"
-                                required
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                                aria-required />
-
-                            <input
-                                type="password"
-                                name="password"
-                                placeholder="Password"
-                                required
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                                aria-required />
-
-                            <div className="flex justify-end gap-3 pt-4">
-                                <button
-                                    type="button"
-                                    onClick={closeModal}
-                                    className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-                                    disabled={isLoading}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={isLoading}
-                                    className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {isLoading ? "Loading..." : "Login"}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+            </form>
 
             {/* Update Password Modal */}
             {isUpdatePasswordOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                    <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-                        <h2 className="mb-4 text-xl font-bold text-gray-800">Update Password</h2>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="w-full max-w-md rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-6 shadow-xl">
+                        <h2 className="mb-4 text-xl font-display font-semibold text-[var(--text-primary)]">Update Password</h2>
 
                         {passwordError && (
-                            <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3">
-                                <p className="text-sm text-red-700">{passwordError}</p>
+                            <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/20 p-3">
+                                <p className="text-sm text-[var(--status-error)]">{passwordError}</p>
                             </div>
                         )}
 
                         {passwordSuccess && (
-                            <div className="mb-4 rounded-lg bg-green-50 border border-green-200 p-3">
-                                <p className="text-sm text-green-700">{passwordSuccess}</p>
+                            <div className="mb-4 rounded-lg bg-green-500/10 border border-green-500/20 p-3">
+                                <p className="text-sm text-[var(--status-success)]">{passwordSuccess}</p>
                             </div>
                         )}
 
@@ -364,7 +292,7 @@ export default function LoginForm() {
                                 onChange={handlePasswordFormChange}
                                 required
                                 disabled={isPasswordLoading}
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:opacity-50"
+                                className="claude-input w-full"
                             />
 
                             <input
@@ -375,7 +303,7 @@ export default function LoginForm() {
                                 onChange={handlePasswordFormChange}
                                 required
                                 disabled={isPasswordLoading}
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:opacity-50"
+                                className="claude-input w-full"
                             />
 
                             <input
@@ -386,14 +314,14 @@ export default function LoginForm() {
                                 onChange={handlePasswordFormChange}
                                 required
                                 disabled={isPasswordLoading}
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:opacity-50"
+                                className="claude-input w-full"
                             />
 
                             <div className="flex justify-end gap-3 pt-2">
                                 <button
                                     type="button"
                                     onClick={closeUpdatePasswordModal}
-                                    className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                                    className="claude-btn-secondary"
                                     disabled={isPasswordLoading}
                                 >
                                     Cancel
@@ -401,7 +329,7 @@ export default function LoginForm() {
                                 <button
                                     type="submit"
                                     disabled={isPasswordLoading}
-                                    className="rounded-lg bg-green-600 px-4 py-2 font-semibold text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="claude-btn-primary"
                                 >
                                     {isPasswordLoading ? "Updating..." : "Update Password"}
                                 </button>

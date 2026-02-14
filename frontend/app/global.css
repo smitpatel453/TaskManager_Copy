@@ -1,28 +1,395 @@
 @import "tailwindcss";
 
+/* ClickUp-inspired clean palette */
 :root {
-  --background: hsl(0, 0%, 100%);
-  --foreground: hsl(0, 0%, 13%);
+  /* Background colors */
+  --bg-canvas: #FFFFFF;
+  --bg-surface: #FAFBFC;
+  --bg-surface-2: #F3F4F6;
+  --bg-surface-3: #E9EBF0;
+  
+  /* Border colors */
+  --border-subtle: #E9EBF0;
+  --border-default: #D1D5DB;
+  --border-hover: #9CA3AF;
+
+  /* Text colors */
+  --text-primary: #111827;
+  --text-secondary: #6B7280;
+  --text-tertiary: #9CA3AF;
+  --text-muted: #BCC0C7;
+
+  /* Accent color - ClickUp purple-blue */
+  --accent: #7B68EE;
+  --accent-hover: #6C5CE7;
+  --accent-light: rgba(123, 104, 238, 0.1);
+
+  /* ClickUp blue */
+  --ck-blue: #0088FF;
+  --ck-blue-hover: #006FD6;
+
+  /* Status colors */
+  --status-success: #00B884;
+  --status-warning: #F59E0B;
+  --status-error: #E03A3A;
+  --status-info: #0088FF;
+
+  /* Shadows */
+  --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-soft-lg: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+/* Dark mode */
+.dark {
+  --bg-canvas: #1A1C1E;
+  --bg-surface: #232528;
+  --bg-surface-2: #2D2F33;
+  --bg-surface-3: #3A3D42;
+
+  --border-subtle: #3A3D42;
+  --border-default: #4A4D52;
+  --border-hover: #6B7280;
+
+  --text-primary: #ffffff;
+  --text-secondary: #D1D5DB;
+  --text-tertiary: #9CA3AF;
+  --text-muted: #6B7280;
+
+  --accent: #9B8AFB;
+  --accent-hover: #B0A1FC;
+  --accent-light: rgba(155, 138, 251, 0.15);
+
+  --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-soft-lg: 0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-background: var(--bg-canvas);
+  --color-foreground: var(--text-primary);
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-crimson);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0d0d0d;
-    --foreground: #fdf7f7;
-  }
+/* Base styles */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+  font-size: 13px;
+}
 
+/* Custom scrollbar - hidden until hover (ClickUp style) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 10px;
+}
+
+*:hover ::-webkit-scrollbar-thumb,
+::-webkit-scrollbar-thumb:hover {
+  background-color: #CBD5E1;
+}
+
+/* Selection */
+::selection {
+  background: var(--accent-light);
+  color: var(--text-primary);
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid var(--ck-blue);
+  outline-offset: 1px;
+}
+
+
+
+
+/* Input autofill styling */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px var(--bg-surface) inset;
+  -webkit-text-fill-color: var(--text-primary);
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* ClickUp-style utility classes */
+.ck-surface {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+}
+
+.ck-card {
+  background-color: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+}
+
+.ck-input {
+  background-color: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: all 0.15s ease;
+}
+
+.ck-input:hover {
+  border-color: var(--border-hover);
+}
+
+.ck-input:focus {
+  border-color: var(--ck-blue);
+  box-shadow: 0 0 0 2px rgba(0, 136, 255, 0.15);
+  outline: none;
+}
+
+.ck-input::placeholder {
+  color: var(--text-muted);
+}
+
+.ck-btn-primary {
+  background-color: var(--text-primary);
+  color: var(--bg-canvas);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.875rem;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  border: none;
+}
+
+.ck-btn-primary:hover {
+  opacity: 0.9;
+}
+
+.ck-btn-secondary {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.875rem;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.ck-btn-secondary:hover {
+  background-color: var(--bg-surface);
+  border-color: var(--border-hover);
+}
+
+.ck-btn-quiet {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  padding: 0.375rem 0.5rem;
+  font-size: 13px;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  border: none;
+}
+
+.ck-btn-quiet:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+  color: var(--text-primary);
+}
+
+.dark .ck-btn-quiet:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Dark mode override for inputs forcing white backgrounds (e.g., subtask field) */
+.dark input.bg-white,
+.dark textarea.bg-white,
+.dark select.bg-white {
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+
+.dark input.bg-white::placeholder,
+.dark textarea.bg-white::placeholder {
+  color: var(--text-muted);
+}
+
+/* Backward compat aliases */
+.claude-card {
+  background-color: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+}
+
+.claude-input {
+  background-color: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: all 0.15s ease;
+}
+
+.claude-input:hover {
+  border-color: var(--border-hover);
+}
+
+.claude-input:focus {
+  border-color: var(--ck-blue);
+  box-shadow: 0 0 0 2px rgba(0, 136, 255, 0.15);
+  outline: none;
+}
+
+.claude-input::placeholder {
+  color: var(--text-muted);
+}
+
+.claude-btn-primary {
+  background-color: var(--text-primary);
+  color: var(--bg-canvas);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.875rem;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  border: none;
+}
+
+.claude-btn-primary:hover {
+  opacity: 0.9;
+}
+
+.claude-btn-secondary {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.875rem;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.claude-btn-secondary:hover {
+  background-color: var(--bg-surface);
+  border-color: var(--border-hover);
+}
+
+.claude-btn-quiet {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  padding: 0.375rem 0.5rem;
+  font-size: 13px;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  border: none;
+}
+
+.claude-btn-quiet:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+  color: var(--text-primary);
+}
+
+/* Typography */
+.font-display {
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+.font-ui {
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+/* Animation utilities */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* ClickUp-style scrollbar for sidebar */
+.ck-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.ck-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ck-scrollbar::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 10px;
+}
+
+.ck-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: #CBD5E1;
+}
+
+/* Hide scrollbar completely */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Shadow utility */
+.shadow-soft {
+  box-shadow: var(--shadow-soft);
+}
+
+.shadow-soft-lg {
+  box-shadow: var(--shadow-soft-lg);
 }

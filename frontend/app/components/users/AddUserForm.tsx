@@ -57,7 +57,6 @@ export default function AddUserForm({ onSuccess }: AddUserFormProps) {
       return;
     }
 
-    // Create payload with trimmed values
     const payload: CreateUserRequest = {
       firstName: formData.firstName.trim(),
       lastName: formData.lastName.trim(),
@@ -72,14 +71,14 @@ export default function AddUserForm({ onSuccess }: AddUserFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          {error}
+        <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3">
+          <p className="text-sm text-[var(--status-error)]">{error}</p>
         </div>
       )}
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="firstName" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
             First Name
           </label>
           <input
@@ -87,13 +86,13 @@ export default function AddUserForm({ onSuccess }: AddUserFormProps) {
             type="text"
             value={formData.firstName}
             onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="claude-input w-full"
             placeholder="Enter first name"
           />
         </div>
 
         <div>
-          <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="lastName" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
             Last Name
           </label>
           <input
@@ -101,14 +100,14 @@ export default function AddUserForm({ onSuccess }: AddUserFormProps) {
             type="text"
             value={formData.lastName}
             onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="claude-input w-full"
             placeholder="Enter last name"
           />
         </div>
       </div>
 
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="email" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
           Email
         </label>
         <input
@@ -116,13 +115,13 @@ export default function AddUserForm({ onSuccess }: AddUserFormProps) {
           type="email"
           value={formData.email}
           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="claude-input w-full"
           placeholder="Enter email"
         />
       </div>
 
       <div>
-        <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="password" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
           Password
         </label>
         <input
@@ -130,20 +129,20 @@ export default function AddUserForm({ onSuccess }: AddUserFormProps) {
           type="password"
           value={formData.password}
           onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="claude-input w-full"
           placeholder="Enter password (min 6 characters)"
         />
       </div>
 
       <div>
-        <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="role" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
           Role
         </label>
         <select
           id="role"
           value={formData.role}
           onChange={(e) => setFormData({ ...formData, role: e.target.value as "admin" | "user" })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="claude-input w-full"
         >
           <option value="user">User</option>
           <option value="admin">Admin</option>
@@ -153,9 +152,19 @@ export default function AddUserForm({ onSuccess }: AddUserFormProps) {
       <button
         type="submit"
         disabled={createUserMutation.isPending}
-        className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+        className="claude-btn-primary w-full flex items-center justify-center gap-2"
       >
-        {createUserMutation.isPending ? "Creating..." : "Create User"}
+        {createUserMutation.isPending ? (
+          <>
+            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            Creating...
+          </>
+        ) : (
+          "Create User"
+        )}
       </button>
     </form>
   );

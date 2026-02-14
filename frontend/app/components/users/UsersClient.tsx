@@ -1,21 +1,31 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { usersApi } from "../../../src/api/users.api";
-import AddUserForm from "./AddUserForm";
-import type { User } from "../../../src/types/user";
+import type { User, CreateUserRequest } from "../../../src/types/user";
 
 export default function UsersClient() {
   const queryClient = useQueryClient();
-  const [showAddForm, setShowAddForm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Inline add state
+  const [isAdding, setIsAdding] = useState(false);
+  const [newFirstName, setNewFirstName] = useState("");
+  const [newLastName, setNewLastName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newRole, setNewRole] = useState<"admin" | "user">("user");
+  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
+
+  const firstNameRef = useRef<HTMLInputElement>(null);
+  const roleDropdownRef = useRef<HTMLDivElement>(null);
 
   const { data: usersData, isLoading } = useQuery({
     queryKey: ["users", currentPage, itemsPerPage],
     queryFn: () => usersApi.getAllUsers(currentPage, itemsPerPage),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 
   const deleteUserMutation = useMutation({
@@ -28,230 +38,333 @@ export default function UsersClient() {
     },
   });
 
-  const handleDelete = (userId: string) => {
+  const createUserMutation = useMutation({
+    mutationFn: usersApi.createUser,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      setIsAdding(false);
+      setNewFirstName("");
+      setNewLastName("");
+      setNewEmail("");
+      setNewPassword("");
+      setNewRole("user");
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.error || "Failed to create user");
+    },
+  });
+
+  const handleCreateUser = () => {
+    if (!newFirstName.trim() || !newLastName.trim()) {
+      alert("First and Last name are required");
+      return;
+    }
+    if (!newEmail.trim()) {
+      alert("Email is required");
+      return;
+    }
+    if (!newPassword || newPassword.length < 6) {
+      alert("Password must be at least 6 characters");
+      return;
+    }
+
+    createUserMutation.mutate({
+      firstName: newFirstName,
+      lastName: newLastName,
+      email: newEmail,
+      password: newPassword,
+      role: newRole,
+    });
+  };
+
+  const handleDelete = (userId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     if (confirm("Are you sure you want to delete this user?")) {
       deleteUserMutation.mutate(userId);
     }
   };
+
+  // Click outside handler for role dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (roleDropdownRef.current && !roleDropdownRef.current.contains(event.target as Node)) {
+        setRoleDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (isAdding && firstNameRef.current) {
+      firstNameRef.current.focus();
+    }
+  }, [isAdding]);
 
   const users = usersData?.data || [];
   const pagination = usersData?.pagination || {
     currentPage: 1,
     totalPages: 1,
     totalItems: 0,
-    itemsPerPage: 10,
+    itemsPerPage: 50,
     hasNextPage: false,
     hasPreviousPage: false,
   };
 
-  const handlePrevious = () => {
-    if (pagination.hasPreviousPage) {
-      setCurrentPage((p) => p - 1);
-    }
-  };
-
-  const handleNext = () => {
-    if (pagination.hasNextPage) {
-      setCurrentPage((p) => p + 1);
-    }
-  };
-
-  const handlePageClick = (page: number) => setCurrentPage(page);
-
-  const handleItemsPerPageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setItemsPerPage(parseInt(e.target.value, 10));
-    setCurrentPage(1);
-  };
-
-  const getPageNumbers = () => {
-    const pages: (number | string)[] = [];
-    const maxButtons = 5;
-    const totalPages = pagination.totalPages;
-
-    if (totalPages <= maxButtons) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-      return pages;
-    }
-
-    pages.push(1);
-    if (currentPage > 3) pages.push("...");
-
-    const start = Math.max(2, currentPage - 1);
-    const end = Math.min(totalPages - 1, currentPage + 1);
-    for (let i = start; i <= end; i++) pages.push(i);
-
-    if (currentPage < totalPages - 2) pages.push("...");
-    pages.push(totalPages);
-
-    return pages;
-  };
-
-  const startIndex = (pagination.currentPage - 1) * pagination.itemsPerPage + 1;
-  const endIndex = Math.min(
-    pagination.currentPage * pagination.itemsPerPage,
-    pagination.totalItems
-  );
-
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          {showAddForm ? "Cancel" : "Add User"}
-        </button>
+    <div className="space-y-0">
+      {/* Breadcrumb + View Tabs */}
+      <div className="border-b border-[var(--border-subtle)] pb-0 -mx-6 px-6 -mt-6 pt-4 bg-[var(--bg-canvas)]">
+        <div className="flex items-center gap-2.5 mb-3 text-[var(--text-tertiary)]">
+          <div className="w-5 h-5 rounded bg-violet-600 text-white flex items-center justify-center">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" />
+            </svg>
+          </div>
+          <span className="font-semibold text-[var(--text-primary)] text-[16px]">User Management</span>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-6 text-[13px] text-[var(--text-tertiary)] font-medium">
+            <button className="pb-3 border-b-2 border-[var(--ck-blue)] text-[var(--ck-blue)] flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
+              List
+            </button>
+            <button className="pb-3 border-b-2 border-transparent hover:text-[var(--text-primary)] transition-colors">
+              + View
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 pb-3">
+            {/* Add User button removed */}
+          </div>
+        </div>
       </div>
 
-      {showAddForm && (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4">Create New User</h2>
-          <AddUserForm onSuccess={() => setShowAddForm(false)} />
-        </div>
-      )}
 
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Name
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Email
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Role
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Created
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+
+      {/* Users Table */}
+      <div className="mt-4 border border-[var(--border-subtle)] rounded-lg bg-[var(--bg-canvas)] shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <div className="min-w-[700px]">
+            {/* Table Header */}
+            <div className="grid grid-cols-[1fr_200px_100px_120px_40px] gap-2 items-center px-8 py-2.5 border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wide rounded-t-lg">
+              <div>Name</div>
+              <div>Email</div>
+              <div>Role</div>
+              <div>Created</div>
+              <div></div>
+            </div>
+
+            {/* Rows */}
             {isLoading ? (
-              <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
-                  Loading users...
-                </td>
-              </tr>
-            ) : users.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
-                  No users found
-                </td>
-              </tr>
+              <div className="flex items-center justify-center py-16">
+                <div className="flex items-center gap-3 text-[var(--text-tertiary)]">
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span className="text-sm">Loading users...</span>
+                </div>
+              </div>
+            ) : users.length === 0 && !isAdding ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center rounded-b-lg">
+                <div className="w-12 h-12 rounded-full bg-[var(--bg-surface-2)] flex items-center justify-center mb-3">
+                  <svg className="w-6 h-6 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                </div>
+                <p className="text-sm text-[var(--text-tertiary)] mb-4">No users found</p>
+                <button
+                  onClick={() => setIsAdding(true)}
+                  className="ck-btn-primary flex items-center gap-2"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                  Create User
+                </button>
+              </div>
             ) : (
               users.map((user: User) => (
-                <tr key={user._id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {user.firstName} {user.lastName}
+                <div
+                  key={user._id}
+                  className="grid grid-cols-[1fr_200px_100px_120px_40px] gap-2 items-center px-4 py-2.5 border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-surface)] group text-[13px] bg-[var(--bg-canvas)] transition-colors"
+                >
+                  {/* Name */}
+                  <div className="flex items-center gap-3 pl-4">
+                    <div className="w-7 h-7 rounded-full bg-gray-700 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                      {user.firstName.charAt(0)}{user.lastName.charAt(0)}
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-600">{user.email}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="truncate font-medium text-[var(--text-primary)]">{user.firstName} {user.lastName}</span>
+                  </div>
+
+                  {/* Email */}
+                  <div className="text-[13px] text-[var(--text-secondary)] truncate">
+                    {user.email}
+                  </div>
+
+                  {/* Role */}
+                  <div>
                     <span
-                      className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        user.role === "admin"
-                          ? "bg-purple-100 text-purple-800"
-                          : "bg-green-100 text-green-800"
-                      }`}
+                      className={`inline-flex items-center rounded px-2.5 py-0.5 text-[11px] font-bold tracking-wide ${user.role === "admin"
+                        ? "bg-violet-500 text-white"
+                        : "bg-[#00b884] text-white"
+                        }`}
                     >
-                      {user.role}
+                      {user.role.toUpperCase()}
                     </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(user.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  </div>
+
+                  {/* Created */}
+                  <div className="text-[13px] text-[var(--text-secondary)]">
+                    {new Date(user.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex justify-center">
                     <button
-                      onClick={() => handleDelete(user._id)}
-                      className="text-red-600 hover:text-red-900"
+                      onClick={(e) => handleDelete(user._id, e)}
+                      className="text-[var(--text-muted)] hover:text-[var(--status-error)] transition-colors opacity-0 group-hover:opacity-100"
+                      title="Delete user"
                     >
-                      Delete
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
                     </button>
-                  </td>
-                </tr>
+                  </div>
+                </div>
               ))
             )}
-          </tbody>
-        </table>
+
+            {/* Inline Add User */}
+            {isAdding ? (
+              <div className="grid grid-cols-[1fr_200px_100px_120px_40px] gap-2 items-center px-4 py-3 border-t border-[var(--border-subtle)] bg-[var(--bg-canvas)] rounded-b-lg">
+                <div className="flex items-center gap-2 pl-4">
+                  <input
+                    ref={firstNameRef}
+                    type="text"
+                    value={newFirstName}
+                    onChange={(e) => setNewFirstName(e.target.value)}
+                    placeholder="First Name"
+                    className="w-1/2 bg-transparent outline-none text-[13px] font-medium text-[var(--text-primary)] placeholder:text-[var(--text-muted)] border border-[var(--border-subtle)] rounded-md px-2 py-1"
+                    onKeyDown={(e) => e.key === 'Enter' && handleCreateUser()}
+                  />
+                  <input
+                    type="text"
+                    value={newLastName}
+                    onChange={(e) => setNewLastName(e.target.value)}
+                    placeholder="Last Name"
+                    className="w-1/2 bg-transparent outline-none text-[13px] font-medium text-[var(--text-primary)] placeholder:text-[var(--text-muted)] border border-[var(--border-subtle)] rounded-md px-2 py-1"
+                    onKeyDown={(e) => e.key === 'Enter' && handleCreateUser()}
+                  />
+                </div>
+
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="Email"
+                  className="bg-transparent outline-none text-[12px] text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] border border-[var(--border-subtle)] rounded-md px-2 py-1 w-full"
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreateUser()}
+                />
+
+                <div className="relative" ref={roleDropdownRef}>
+                  <button
+                    onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
+                    className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold tracking-wide cursor-pointer hover:opacity-80 transition-opacity ${newRole === "admin" ? "bg-violet-500 text-white" : "bg-[#00b884] text-white"}`}
+                  >
+                    {newRole.toUpperCase()}
+                    <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" className="ml-1"><path d="M7 10l5 5 5-5z" /></svg>
+                  </button>
+                  {roleDropdownOpen && (
+                    <div className="absolute z-50 top-full left-0 mt-1 w-24 rounded shadow-lg bg-[var(--bg-canvas)] border border-[var(--border-subtle)] overflow-hidden">
+                      <button onClick={() => { setNewRole("user"); setRoleDropdownOpen(false); }} className="block w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--bg-surface)]">User</button>
+                      <button onClick={() => { setNewRole("admin"); setRoleDropdownOpen(false); }} className="block w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--bg-surface)]">Admin</button>
+                    </div>
+                  )}
+                </div>
+
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Password (min 6)"
+                  className="bg-transparent outline-none text-[12px] text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] border border-[var(--border-subtle)] rounded-md px-2 py-1 w-full"
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreateUser()}
+                />
+
+                {/* Actions */}
+                <div className="flex justify-center items-center gap-2">
+                  <button
+                    onClick={handleCreateUser}
+                    disabled={createUserMutation.isPending}
+                    className="text-green-600 hover:text-green-700 transition-colors"
+                    title="Save User"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                  </button>
+                  <button
+                    onClick={() => setIsAdding(false)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    title="Cancel"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              (users.length > 0 || isAdding) && (
+                <button
+                  onClick={() => { setIsAdding(true); setNewFirstName(""); setNewLastName(""); setNewEmail(""); setNewPassword(""); setNewRole("user"); }}
+                  className="w-full flex items-center gap-2 px-8 py-3 text-[13px] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-all border-t border-[var(--border-subtle)] rounded-b-lg"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                  Add User
+                </button>
+              )
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Pagination */}
       {pagination.totalItems > 0 && (
-        <div className="bg-white px-6 py-4 rounded-b-lg shadow-md border-t border-gray-200">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-sm text-gray-700">
-              Showing <span className="font-medium">{startIndex}</span> to{" "}
-              <span className="font-medium">{endIndex}</span> of{" "}
-              <span className="font-medium">{pagination.totalItems}</span> results
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handlePrevious}
-                disabled={!pagination.hasPreviousPage}
-                className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Previous
-              </button>
-
-              <div className="hidden sm:flex items-center gap-1">
-                {getPageNumbers().map((page, index) =>
-                  typeof page === "string" ? (
-                    <span key={`ellipsis-${index}`} className="px-2 text-gray-500">
-                      {page}
-                    </span>
-                  ) : (
-                    <button
-                      key={page}
-                      onClick={() => handlePageClick(page)}
-                      className={[
-                        "inline-flex h-9 w-9 items-center justify-center rounded-lg border text-sm font-medium shadow-sm transition",
-                        currentPage === page
-                          ? "border-blue-200 bg-blue-50 text-blue-700"
-                          : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50",
-                      ].join(" ")}
-                    >
-                      {page}
-                    </button>
-                  )
-                )}
-              </div>
-
-              <button
-                onClick={handleNext}
-                disabled={!pagination.hasNextPage}
-                className="inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-
-            <div className="w-40">
-              <label htmlFor="itemsPerPage" className="sr-only">
-                Items per page
-              </label>
+        <div className="mt-4 flex items-center justify-between text-xs text-[var(--text-secondary)]">
+          <div className="flex items-center gap-3">
+            <span>
+              Showing {(pagination.currentPage - 1) * pagination.itemsPerPage + 1}–
+              {Math.min(pagination.currentPage * pagination.itemsPerPage, pagination.totalItems)} of {pagination.totalItems}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[var(--text-muted)]">Rows per page:</span>
               <select
-                id="itemsPerPage"
                 value={itemsPerPage}
-                onChange={handleItemsPerPageChange}
-                className="h-9 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 shadow-sm focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                className="bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded-md px-1.5 py-0.5 text-xs text-[var(--text-secondary)] outline-none cursor-pointer"
               >
-                <option value="10">10 / page</option>
-                <option value="25">25 / page</option>
-                <option value="50">50 / page</option>
-                <option value="100">100 / page</option>
+                {[5, 10, 15, 25, 50].map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
               </select>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { if (pagination.hasPreviousPage) setCurrentPage(p => p - 1); }}
+              disabled={!pagination.hasPreviousPage}
+              className="border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[var(--text-secondary)] px-2.5 py-1 rounded-md text-xs hover:bg-[var(--bg-surface)] disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="text-[var(--text-tertiary)]">
+              Page {pagination.currentPage} of {pagination.totalPages}
+            </span>
+            <button
+              onClick={() => { if (pagination.hasNextPage) setCurrentPage(p => p + 1); }}
+              disabled={!pagination.hasNextPage}
+              className="border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[var(--text-secondary)] px-2.5 py-1 rounded-md text-xs hover:bg-[var(--bg-surface)] disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
           </div>
         </div>
       )}
