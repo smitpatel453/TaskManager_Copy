@@ -16,6 +16,11 @@ export const CORS_CONFIG = {
       return callback(null, true);
     }
     
+    // Allow all Vercel deployment URLs
+    if (origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    }
+    
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
