@@ -57,6 +57,11 @@ export default function AddProjectForm({ users, onSuccess }: AddProjectFormProps
       return;
     }
 
+    if (formData.assignedUsers.length === 0) {
+      setError("Please select at least one user to assign to the project");
+      return;
+    }
+
     createProjectMutation.mutate(formData);
   };
 
@@ -105,7 +110,7 @@ export default function AddProjectForm({ users, onSuccess }: AddProjectFormProps
 
       <div>
         <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-          Assign Users
+          Assign Users <span className="text-[var(--status-error)]">*</span>
         </label>
         <div className="border border-[var(--border-subtle)] rounded-lg p-4 max-h-48 overflow-y-auto bg-[var(--bg-canvas)]">
           {users.length === 0 ? (
@@ -138,9 +143,13 @@ export default function AddProjectForm({ users, onSuccess }: AddProjectFormProps
             </div>
           )}
         </div>
-        {formData.assignedUsers.length > 0 && (
+        {formData.assignedUsers.length > 0 ? (
           <p className="text-xs text-[var(--text-tertiary)] mt-2">
             {formData.assignedUsers.length} user{formData.assignedUsers.length !== 1 ? 's' : ''} selected
+          </p>
+        ) : (
+          <p className="text-xs text-[var(--status-error)] mt-2">
+            At least one user must be selected
           </p>
         )}
       </div>

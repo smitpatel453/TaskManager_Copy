@@ -215,8 +215,24 @@ export default function Sidebar({ userRole }: SidebarProps) {
     }
 
     if (typeof window !== "undefined") {
-      const isDark = document.documentElement.classList.contains("dark");
+      // Check localStorage first, then fall back to document class
+      const storedTheme = localStorage.getItem("theme-mode");
+      let isDark = false;
+      
+      if (storedTheme) {
+        isDark = storedTheme === "dark";
+      } else {
+        isDark = document.documentElement.classList.contains("dark");
+      }
+      
       setIsDarkMode(isDark);
+      
+      // Apply the theme from storage or document
+      if (isDark) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
     }
   }, []);
 
@@ -332,8 +348,10 @@ export default function Sidebar({ userRole }: SidebarProps) {
     setIsDarkMode(newDarkMode);
     if (newDarkMode) {
       document.documentElement.classList.add("dark");
+      localStorage.setItem("theme-mode", "dark");
     } else {
       document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme-mode", "light");
     }
   };
 

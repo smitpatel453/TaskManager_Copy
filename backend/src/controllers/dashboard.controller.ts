@@ -17,7 +17,8 @@ export class DashboardController {
         return;
       }
 
-      const stats = await this.dashboardService.getStats(userId);
+      const projectId = typeof req.query.projectId === "string" ? req.query.projectId : undefined;
+      const stats = await this.dashboardService.getStats(userId, projectId);
       res.json(stats);
     } catch (error) {
       console.error("Get dashboard stats error:", error);

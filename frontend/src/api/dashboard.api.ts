@@ -17,8 +17,10 @@ export interface DashboardStatsResponse {
 }
 
 export const dashboardApi = {
-  getStats: async () => {
-    const response = await api.get<DashboardStatsResponse>("/dashboard/stats");
+  getStats: async (projectId?: string) => {
+    const response = await api.get<DashboardStatsResponse>("/dashboard/stats", {
+      params: projectId ? { projectId } : undefined,
+    });
     return response.data;
   },
 };

@@ -61,6 +61,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
   // Status filter for client-side filtering
   const [statusFilter, setStatusFilter] = useState<"all" | "to-do" | "in-progress" | "completed">("all");
   const [groupByStatus, setGroupByStatus] = useState(true);
+  const [statusProjectFilter, setStatusProjectFilter] = useState<string>("all");
 
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
     "in-progress": false,
@@ -145,7 +146,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
   const { data: projectsData } = useQuery({
     queryKey: ["projects", isAdmin ? "admin" : "user"],
     queryFn: isAdmin ? projectsApi.getAllProjects : projectsApi.getMyProjects,
-    enabled: addingInGroup !== null,
+    enabled: addingInGroup !== null || (isAdmin && groupByStatus),
     staleTime: 5 * 60 * 1000,
   });
   const projects = projectsData?.data || [];
@@ -189,6 +190,11 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
   // Client-side project filter
   if (projectFilter) {
     items = items.filter((t) => t.projectId === projectFilter);
+  }
+
+  // Admin-only project filter for workload-by-status
+  if (groupByStatus && isAdmin && statusProjectFilter !== "all") {
+    items = items.filter((t) => t.projectId === statusProjectFilter);
   }
 
   // Client-side status filter
@@ -521,6 +527,18 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
             </svg>
             Group: Status
           </button>
+          {isAdmin && groupByStatus && (
+            <select
+              value={statusProjectFilter}
+              onChange={(e) => { setStatusProjectFilter(e.target.value); setCurrentPage(1); }}
+              className="flex items-center gap-1.5 border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[var(--text-secondary)] px-2 py-1 rounded-md text-xs hover:bg-[var(--bg-surface)] shadow-sm outline-none"
+            >
+              <option value="all">All Projects</option>
+              {projects.map((project) => (
+                <option key={project._id} value={project._id}>{project.projectName}</option>
+              ))}
+            </select>
+          )}
           {!readOnly && (
             <button 
               onClick={() => startInlineAdd("to-do")}
@@ -546,20 +564,6 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
             <option value="in-progress">In Progress</option>
             <option value="completed">Completed</option>
           </select>
-          <button className="flex items-center gap-1.5 border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[var(--text-secondary)] px-2.5 py-1 rounded-md hover:bg-[var(--bg-surface)] shadow-sm">
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-            </svg>
-            Filter
-          </button>
-          <button className="p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-surface)] rounded-md">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-          </button>
-          <button className="p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-surface)] rounded-md">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </button>
         </div>
       </div>
 
@@ -578,9 +582,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                 Due date
                 <svg className="w-3 h-3 text-purple-400 bg-purple-50 rounded-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
               </div>
-              <div className="flex justify-center">
-                <svg className="w-3.5 h-3.5 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-              </div>
+              <div className="flex justify-center" />
             </div>
 
             {/* Rows */}

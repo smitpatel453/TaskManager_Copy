@@ -8,7 +8,7 @@ export class DashboardService {
     this.userModel = new UserModel();
   }
 
-  async getStats(userId: string): Promise<any> {
+  async getStats(userId: string, projectId?: string): Promise<any> {
     const db = mongoose.connection.db;
     if (!db) {
       throw new Error("Database connection failed");
@@ -32,11 +32,20 @@ export class DashboardService {
     const tasksCollection = db.collection("TaskManager");
     const usersCollection = db.collection("users");
 
+    const taskMatch: Record<string, unknown> = {};
+    if (projectId) {
+      if (!mongoose.Types.ObjectId.isValid(projectId)) {
+        throw new Error("Invalid projectId");
+      }
+      taskMatch.projectId = new mongoose.Types.ObjectId(projectId);
+    }
+
     const [totalProjects, totalTasks, totalUsers, tasksByStatus] = await Promise.all([
       projectsCollection.countDocuments(),
-      tasksCollection.countDocuments(),
+      tasksCollection.countDocuments(taskMatch),
       usersCollection.countDocuments(),
       tasksCollection.aggregate([
+        ...(Object.keys(taskMatch).length > 0 ? [{ $match: taskMatch }] : []),
         {
           $group: {
             _id: "$status",

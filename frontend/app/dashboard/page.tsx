@@ -19,6 +19,7 @@ const PROJECT_COLORS = [
 
 export default function DashboardPage() {
   const [isAdmin, setIsAdmin] = useState(false);
+  const [workloadProjectId, setWorkloadProjectId] = useState<string>("all");
   const hasInitialized = useRef(false);
 
   // Initialize admin status only once
@@ -38,8 +39,8 @@ export default function DashboardPage() {
   }, []);
 
   const { data: stats } = useQuery({
-    queryKey: ["dashboard-stats"],
-    queryFn: dashboardApi.getStats,
+    queryKey: ["dashboard-stats", workloadProjectId],
+    queryFn: () => dashboardApi.getStats(workloadProjectId === "all" ? undefined : workloadProjectId),
     enabled: isAdmin,
     staleTime: 5 * 60 * 1000,
   });
@@ -72,42 +73,8 @@ export default function DashboardPage() {
     completed: "#10B981",
   };
 
-  const tabs = [
-    { id: "overview", label: "Overview", icon: OverviewIcon },
-    { id: "list", label: "List", icon: ListIcon },
-    { id: "board", label: "Board", icon: BoardIcon },
-  ];
-
-  const handleTabClick = (tabId: string) => {
-    // Tab switching functionality for future implementation
-    // Current tab: Overview is the default
-  };
-
   return (
     <div>
-
-
-      {/* Tabs */}
-      <div className="flex items-center gap-0 border-b border-[var(--border-subtle)] -mx-6 px-6 mb-6">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => handleTabClick(tab.id)}
-            className={`flex items-center gap-1.5 px-3.5 py-2.5 text-[13px] font-medium border-b-2 transition-colors ${
-              tab.id === "overview"
-                ? "border-[var(--text-primary)] text-[var(--text-primary)]"
-                : "border-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
-            }`}
-          >
-            <tab.icon active={tab.id === "overview"} />
-            {tab.label}
-          </button>
-        ))}
-        <button className="flex items-center gap-1 px-3.5 py-2.5 text-[13px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] border-b-2 border-transparent transition-colors">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-          View
-        </button>
-      </div>
 
       {/* Info Bar */}
       <div className="flex items-center justify-between mb-6 text-[13px]">
@@ -178,6 +145,20 @@ export default function DashboardPage() {
 
             {/* Workload by Status – Donut Chart */}
             <OverviewCard title="Workload by Status">
+              {isAdmin && (
+                <div className="flex items-center justify-end pb-2">
+                  <select
+                    value={workloadProjectId}
+                    onChange={(e) => setWorkloadProjectId(e.target.value)}
+                    className="border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[var(--text-secondary)] px-2 py-1 rounded-md text-[11px] hover:bg-[var(--bg-surface)] shadow-sm outline-none"
+                  >
+                    <option value="all">All Projects</option>
+                    {projects.map((project) => (
+                      <option key={project._id} value={project._id}>{project.projectName}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               {tasksByStatus.length > 0 ? (
                 <div className="flex items-center justify-center py-3">
                   <div className="relative">

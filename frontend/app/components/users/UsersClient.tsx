@@ -133,15 +133,7 @@ export default function UsersClient() {
         </div>
 
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6 text-[13px] text-[var(--text-tertiary)] font-medium">
-            <button className="pb-3 border-b-2 border-[var(--ck-blue)] text-[var(--ck-blue)] flex items-center gap-1.5">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
-              List
-            </button>
-            <button className="pb-3 border-b-2 border-transparent hover:text-[var(--text-primary)] transition-colors">
-              + View
-            </button>
-          </div>
+          <div className="flex items-center gap-6 text-[13px] text-[var(--text-tertiary)] font-medium" />
 
           <div className="flex items-center gap-3 pb-3">
             {/* Add User button removed */}
