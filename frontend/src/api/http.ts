@@ -11,8 +11,12 @@ export const api = axios.create({
 
 // Add token to requests
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  const isBrowser = typeof window !== "undefined" && typeof localStorage !== "undefined";
+  const token = isBrowser ? localStorage.getItem("token") : null;
+  if (token) {
+    config.headers = config.headers ?? {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   return config;
 });
 

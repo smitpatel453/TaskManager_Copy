@@ -59,7 +59,7 @@ export default function ProjectsClient({ userRole }: { userRole?: "admin" | "use
     onError: (error: any) => {
       const errorMessage = error?.response?.data?.error || error?.message || "Failed to create project";
       setProjectError(errorMessage);
-      setIsAdding(false);
+      setIsAdding(true);
       console.error("Failed to create project:", error);
     },
   });

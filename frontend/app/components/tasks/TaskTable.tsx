@@ -34,6 +34,13 @@ type TaskTableProps = {
   readOnly?: boolean;
 };
 
+type CurrentUserProfile = {
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  name?: string;
+};
+
 const groupOrder: Array<"in-progress" | "to-do" | "completed"> = ["in-progress", "to-do", "completed"];
 
 const groupConfigs = {
@@ -99,7 +106,8 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
     return filtered;
   }, [data?.data, projectFilter, assignedToFilter]);
 
-  const displayTotal = filteredTasks.length > 0 ? filteredTasks.length : (data?.pagination?.totalItems || 0);
+  const hasClientFilter = Boolean(projectFilter || assignedToFilter);
+  const displayTotal = hasClientFilter ? filteredTasks.length : (data?.pagination?.totalItems || 0);
 
   // Click outside handler for custom dropdowns
   useEffect(() => {
@@ -115,6 +123,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
   // Fetch projects for dropdowns
   const [isAdmin, setIsAdmin] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState<CurrentUserProfile | null>(null);
 
   useEffect(() => {
     const userStr = localStorage.getItem("user");
@@ -123,6 +132,12 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
         const user = JSON.parse(userStr);
         setIsAdmin(user.role === "admin");
         setCurrentUserId(user.id || user._id);
+        setCurrentUserProfile({
+          firstName: user.firstName,
+          lastName: user.lastName,
+          fullName: user.fullName,
+          name: user.name,
+        });
       } catch { /* ignore */ }
     }
   }, []);
@@ -194,6 +209,14 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
     hasNextPage: false,
     hasPreviousPage: false,
   };
+
+  const displayedCount = items.length;
+  const shownStart = hasClientFilter
+    ? (displayedCount > 0 ? 1 : 0)
+    : (displayTotal > 0 ? (pagination.currentPage - 1) * pagination.itemsPerPage + 1 : 0);
+  const shownEnd = hasClientFilter
+    ? displayedCount
+    : Math.min(pagination.currentPage * pagination.itemsPerPage, displayTotal);
 
   // Group tasks by status
   const groupedTasks = useMemo(() => {
@@ -312,10 +335,17 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
     if (assignee) return assignee;
     // For non-admins when users query is disabled, use current user
     if (!isAdmin && users.length === 0 && newTaskAssignee === currentUserId) {
-      return { _id: currentUserId, firstName: currentUserId, lastName: "", fullName: currentUserId };
+      const firstName = currentUserProfile?.firstName || currentUserProfile?.name || "You";
+      const lastName = currentUserProfile?.lastName || "";
+      return {
+        _id: currentUserId,
+        firstName,
+        lastName,
+        fullName: currentUserProfile?.fullName || `${firstName} ${lastName}`.trim(),
+      };
     }
     return undefined;
-  }, [users, newTaskAssignee, currentUserId, isAdmin]);
+  }, [users, newTaskAssignee, currentUserId, isAdmin, currentUserProfile]);
 
   // Helper to format hours:minutes to "HH:MM"
   const toHHMM = (h: number, m: number) => {
@@ -379,7 +409,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
       return "For tasks >= 4 hours, at least 3 subtasks are required";
     }
     if (totalEstHours >= 3 && totalEstHours < 4 && subtasks.length < 2) {
-      return "For tasks = 3 hours, at least 2 subtasks are required";
+      return "For tasks between 3 and 4 hours, at least 2 subtasks are required";
     }
 
     return null;
@@ -1226,8 +1256,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
         <div className="mt-4 flex items-center justify-between text-xs text-[var(--text-secondary)]">
           <div className="flex items-center gap-3">
             <span>
-              Showing {(pagination.currentPage - 1) * pagination.itemsPerPage + 1}–
-              {Math.min(pagination.currentPage * pagination.itemsPerPage, displayTotal)} of {displayTotal}
+              Showing {shownStart}–{shownEnd} of {displayTotal}
             </span>
             <div className="flex items-center gap-1.5">
               <span className="text-[var(--text-muted)]">Rows per page:</span>
