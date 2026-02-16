@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import { projectsApi } from "../../../src/api/projects.api";
-import type { Project, CreateProjectRequest } from "../../../src/types/project";
+import type { Project } from "../../../src/types/project";  
 
 export default function ProjectsClient({ userRole }: { userRole?: "admin" | "user" }) {
   const queryClient = useQueryClient();
@@ -27,7 +27,7 @@ export default function ProjectsClient({ userRole }: { userRole?: "admin" | "use
     if (userStr) {
       try {
         const user = JSON.parse(userStr);
-        setCurrentUserId(user.id || user._id);
+        setCurrentUserId(user.userId || user.id || user._id);
       } catch { /* ignore */ }
     }
   }, []);
@@ -64,49 +64,78 @@ export default function ProjectsClient({ userRole }: { userRole?: "admin" | "use
     },
   });
 
-  const handleCreateProject = () => {
-    setProjectError("");
+ const handleCreateProject = () => {
+  setProjectError("");
+  
+  if (!newProjectName.trim()) {
+    setProjectError("Project name is required");
+    return;
+  }
+  if (!newProjectDesc.trim()) {
+    setProjectError("Description is required");
+    return;
+  }
+
+  // Check if admin is trying to assign the project to themselves
+  if (isAdmin) {
+    // Get current user ID fresh from localStorage if not in state
+    const userId = currentUserId || (() => {
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          return user.userId || user.id || user._id;
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    })();
+
+    if (!userId) {
+      setProjectError("Unable to verify current user. Please refresh the page.");
+      return;
+    }
     
-    if (!newProjectName.trim()) {
-      setProjectError("Project name is required");
-      return;
-    }
-    if (!newProjectDesc.trim()) {
-      setProjectError("Description is required");
-      return;
-    }
-
-    // Check if admin is trying to assign the project to themselves
-    if (isAdmin) {
-      if (!currentUserId) {
-        setProjectError("Unable to verify current user");
-        return;
-      }
-      if (newProjectUsers.includes(currentUserId)) {
-        setProjectError("You cannot assign a project to yourself");
-        return;
-      }
-    }
-
-    createProjectMutation.mutate({
-      projectName: newProjectName,
-      projectDescription: newProjectDesc,
-      assignedUsers: newProjectUsers,
-    });
-  };
-
-  const toggleUser = (userId: string) => {
-    // Prevent admin from selecting themselves
-    if (isAdmin && userId === currentUserId) {
+    if (newProjectUsers.includes(userId)) {
       setProjectError("You cannot assign a project to yourself");
       return;
     }
-    
-    setProjectError("");
-    setNewProjectUsers(prev =>
-      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
-    );
-  };
+  }
+
+  createProjectMutation.mutate({
+    projectName: newProjectName,
+    projectDescription: newProjectDesc,
+    assignedUsers: newProjectUsers,
+  });
+};
+
+ const toggleUser = (userId: string) => {
+  // Get current user ID
+  const myUserId = currentUserId || (() => {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        return user.userId || user.id || user._id;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  })();
+
+  // Prevent admin from selecting themselves
+  if (isAdmin && userId === myUserId) {
+    setProjectError("You cannot assign a project to yourself");
+    return;
+  }
+  
+  setProjectError("");
+  setNewProjectUsers(prev =>
+    prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+  );
+};
 
   // Click outside handler
   useEffect(() => {
