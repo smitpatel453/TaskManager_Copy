@@ -431,6 +431,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
                       </button>
                       <Link
                         href="/dashboard/projects"
+                        prefetch={false}
                         className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[var(--bg-surface-2)] hover:bg-[var(--bg-surface-3)] text-[var(--text-primary)] text-[11px] font-medium transition-colors border border-[var(--border-subtle)]"
                       >
                         <svg aria-hidden="true" height="16" viewBox="0 0 16 16" width="16" className="octicon octicon-repo text-[var(--text-primary)] dark:text-white" fill="currentColor">
@@ -470,6 +471,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
                 {isCollapsed && (
                   <Link
                     href="/dashboard/projects"
+                    prefetch={false}
                     className="mt-2 flex items-center justify-center p-2 rounded bg-[var(--bg-surface-2)] hover:bg-[var(--bg-surface-3)] text-[var(--text-primary)] transition-colors border border-[var(--border-subtle)]"
                     title="New Project"
                   >
@@ -664,7 +666,7 @@ function SidebarItem({
   );
 
   if (href) {
-    return <Link href={href} className="block w-full">{content}</Link>;
+    return <Link href={href} prefetch={false} className="block w-full">{content}</Link>;
   }
 
   return content;
@@ -701,7 +703,7 @@ function ProjectSidebarItem({ project, pathname, searchParams }: { project: { _i
         </button>
 
         {/* Folder icon + name (navigates) */}
-        <Link href={`/dashboard/tasks?project=${project._id}`} className="flex items-center gap-2 flex-1 min-w-0">
+        <Link href={`/dashboard/tasks?project=${project._id}`} prefetch={false} className="flex items-center gap-2 flex-1 min-w-0">
           <span className={`flex-shrink-0 ${
             isActive ? "text-[var(--ck-blue)]" : "text-[var(--text-muted)]"
           }`}>
@@ -734,6 +736,7 @@ function ProjectSidebarItem({ project, pathname, searchParams }: { project: { _i
                 <div className="flex-1 min-w-0">
                   <Link
                     href={`/dashboard/tasks?project=${project._id}&assignedTo=${u._id}`}
+                    prefetch={false}
                     className={`flex items-center gap-2 px-2 py-1 rounded hover:bg-[var(--bg-surface-2)] transition-colors cursor-pointer group/user ${
                       pathname === "/dashboard/tasks" && searchParams.get("project") === project._id && searchParams.get("assignedTo") === u._id
                         ? "bg-[var(--bg-surface-2)]"

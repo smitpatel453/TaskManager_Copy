@@ -148,6 +148,7 @@ export default function DashboardPage() {
                 <Link
                   key={project._id}
                   href={`/dashboard/tasks?project=${project._id}`}
+                  prefetch={false}
                   className="flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-[var(--bg-surface-2)] transition-colors group"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={PROJECT_COLORS[i % PROJECT_COLORS.length]} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
@@ -254,6 +255,7 @@ export default function DashboardPage() {
               <div className="space-y-2 py-2">
                 <Link
                   href="/dashboard/tasks"
+                  prefetch={false}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors group"
                 >
                   <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-sm group-hover:scale-110 transition-transform">
@@ -266,6 +268,7 @@ export default function DashboardPage() {
                 </Link>
                 <Link
                   href="/dashboard/tasks?filter=assigned"
+                  prefetch={false}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors group"
                 >
                   <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-sm group-hover:scale-110 transition-transform">
