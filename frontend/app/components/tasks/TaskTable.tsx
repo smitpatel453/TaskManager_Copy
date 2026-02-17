@@ -5,6 +5,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { tasksApi } from "../../../src/api/tasks.api";
 import { projectsApi } from "../../../src/api/projects.api";
+import { error } from "console";
 
 export type TaskDetail = {
   text: string;
@@ -367,12 +368,24 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
     return { hours: h || 0, minutes: m || 0 };
   };
 
+  const currentSubtaskTotalMinutes = useMemo(() => {
+    const h = parseInt(currentSubtaskHours || "0", 10);
+    const m = parseInt(currentSubtaskMinutes || "0", 10);
+    return h * 60 + m;
+  }, [currentSubtaskHours, currentSubtaskMinutes]);
+
+  const isSubtaskOverAdminLimit = isAdmin && currentSubtaskTotalMinutes > 120;
+
   const addSubtask = () => {
     const h = parseInt(currentSubtaskHours || "0", 10);
     const m = parseInt(currentSubtaskMinutes || "0", 10);
-
+    if (isAdmin && h * 60 + m > 120) {
+      setSubmissionError("Admins cannot add subtasks longer than 2 hours.");
+      return;
+    }
     if (!currentSubtaskText.trim() || (h === 0 && m === 0)) return;
 
+    setSubmissionError(null);
     setSubtasks([...subtasks, { text: currentSubtaskText, hours: h, minutes: m }]);
     setCurrentSubtaskText("");
     setCurrentSubtaskHours("");
@@ -912,7 +925,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                                   </div>
                                   <button
                                     onClick={addSubtask}
-                                    disabled={!currentSubtaskText.trim() || (parseInt(currentSubtaskHours || "0") === 0 && parseInt(currentSubtaskMinutes || "0") === 0)}
+                                    disabled={!currentSubtaskText.trim() || (parseInt(currentSubtaskHours || "0") === 0 && parseInt(currentSubtaskMinutes || "0") === 0) || isSubtaskOverAdminLimit}
                                     className="px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[11px] font-medium rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
                                     Add
@@ -1217,7 +1230,7 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                           </div>
                           <button
                             onClick={addSubtask}
-                            disabled={!currentSubtaskText.trim() || (parseInt(currentSubtaskHours || "0") === 0 && parseInt(currentSubtaskMinutes || "0") === 0)}
+                            disabled={!currentSubtaskText.trim() || (parseInt(currentSubtaskHours || "0") === 0 && parseInt(currentSubtaskMinutes || "0") === 0) || isSubtaskOverAdminLimit}
                             className="px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[11px] font-medium rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Add

@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { TaskModel } from "../models/task.model.js";
+import { EmailService } from "./email.service.js";
 import type { CreateTaskRequest, DetailBlock, TaskStatus } from "../shared/types/index.js";
 
 function isValidTimeHHMM(value: unknown): value is string {
@@ -24,9 +25,11 @@ function isValidStatus(value: unknown): value is TaskStatus {
 
 export class TasksService {
   private taskModel: TaskModel;
+  private emailService: EmailService;
 
   constructor() {
     this.taskModel = new TaskModel();
+    this.emailService = new EmailService();
   }
 
   async createTask(data: CreateTaskRequest, userId: string): Promise<any> {
@@ -148,6 +151,26 @@ export class TasksService {
     }
 
     const result = await this.taskModel.create(taskData);
+
+    const assignedUserEmail = typeof assignedUser.email === "string" ? assignedUser.email : null;
+    const assignedUserName = [assignedUser.firstName, assignedUser.lastName].filter(Boolean).join(" ") || "there";
+
+    if (assignedUserEmail) {
+      try {
+        await this.emailService.sendTaskAssignedEmail({
+          to: assignedUserEmail,
+          recipientName: assignedUserName,
+          taskName: taskData.taskName,
+          details: cleanedDetails,
+          hours: taskData.hours,
+          status: taskData.status,
+          startDate,
+          dueDate,
+        });
+      } catch (error) {
+        console.error("Failed to send task assignment email:", error);
+      }
+    }
 
     return {
       ok: true,
