@@ -58,12 +58,16 @@ export default function VerifyEmailClient() {
               <div className="mx-auto h-10 w-10 rounded-full border-4 border-[var(--border-subtle)] border-t-blue-600 animate-spin" />
             )}
             {status === "success" && (
-              <div className="mx-auto h-20 w-20 flex items-center justify-center">
-                <img 
-                  src="/verified-badge.svg" 
-                  alt="Email verified" 
-                  className="w-full h-full object-contain"
-                />
+              <div className="mx-auto flex items-center justify-center gap-2">
+                <div className="h-10 w-10 rounded-full bg-gray-700 text-white flex items-center justify-center text-lg font-semibold">
+                  u
+                </div>
+                <div className="flex items-center gap-1">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-500">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span className="text-green-500 font-semibold">Verified</span>
+                </div>
               </div>
             )}
             {status === "error" && (
