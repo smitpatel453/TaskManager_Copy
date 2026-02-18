@@ -196,7 +196,7 @@ export default function UsersClient() {
                         {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
                       </div>
                       {user.emailVerified ? (
-                        <img src="/assets/verified-badge.svg" alt="Verified" className="w-4 h-4" title="Email Verified" />
+                        <img src="/verified.svg" alt="Verified" className="w-4 h-4" title="Email Verified" />
                       ) : null}
                     </div>
                     <span className="truncate font-medium text-[var(--text-primary)]">{user.firstName} {user.lastName}</span>
