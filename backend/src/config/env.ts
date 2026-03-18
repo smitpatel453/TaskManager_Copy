@@ -2,6 +2,15 @@ import dotenv from "dotenv";
 
 dotenv.config({ path: ".env" });
 
+// Validate required env vars early so the rest of the app gets properly typed values
+if (!process.env.MONGODB_URI) {
+  throw new Error("Missing MONGODB_URI in environment variables");
+}
+
+if (!process.env.JWT_SECRET) {
+  throw new Error("Missing JWT_SECRET in environment variables");
+}
+
 export const ENV = {
   NODE_ENV: process.env.NODE_ENV || "development",
   PORT: parseInt(process.env.PORT || "3001", 10),
@@ -17,12 +26,3 @@ export const ENV = {
   SMTP_FROM: process.env.SMTP_FROM,
   SMTP_SECURE: (process.env.SMTP_SECURE || "false").toLowerCase() === "true",
 };
-
-// Validate required env vars
-if (!ENV.MONGODB_URI) {
-  throw new Error("Missing MONGODB_URI in environment variables");
-}
-
-if (!ENV.JWT_SECRET) {
-  throw new Error("Missing JWT_SECRET in environment variables");
-}

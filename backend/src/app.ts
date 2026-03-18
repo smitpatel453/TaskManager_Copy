@@ -10,9 +10,12 @@ import usersRoutes from "./routes/users.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import connectDB from "./infrastructure/database/mongodb.js";
 
+const AUTH_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const AUTH_RATE_LIMIT_MAX = parseInt(process.env.AUTH_RATE_LIMIT_MAX || "20", 10);
+
 const authRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,
+  windowMs: AUTH_RATE_LIMIT_WINDOW_MS,
+  max: AUTH_RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later." },

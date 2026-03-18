@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { AuthService } from "../services/auth.service.js";
+import { isStrongPassword, STRONG_PASSWORD_MESSAGE } from "../shared/validation.js";
 
 export class AuthController {
   private authService: AuthService;
@@ -50,13 +51,8 @@ export class AuthController {
       }
 
       // Validate password strength
-      const hasLength = body.newPassword.length >= 8;
-      const hasUppercase = /[A-Z]/.test(body.newPassword);
-      const hasLowercase = /[a-z]/.test(body.newPassword);
-      const hasDigit = /\d/.test(body.newPassword);
-      const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(body.newPassword);
-      if (!hasLength || !hasUppercase || !hasLowercase || !hasDigit || !hasSpecial) {
-        res.status(400).json({ error: "New password must be at least 8 characters and include uppercase, lowercase, number, and special character" });
+      if (!isStrongPassword(body.newPassword)) {
+        res.status(400).json({ error: STRONG_PASSWORD_MESSAGE });
         return;
       }
 
