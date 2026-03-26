@@ -10,7 +10,6 @@
     "start": "node dist/server.js",
     "lint": "eslint src",
     "seed": "tsx scripts/seed.ts",
-    "seed:old": "tsx scripts/seedUsers.js",
     "migrate:fields": "tsx scripts/migrateTaskFields.ts",
     "migrate:roles": "tsx scripts/migrateRolesToObjectIds.ts",
     "promote:admin": "tsx scripts/promoteUserToAdmin.ts"
