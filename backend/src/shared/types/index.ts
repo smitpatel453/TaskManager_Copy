@@ -85,6 +85,7 @@ export interface CreateProjectRequest {
   projectName: string;
   projectDescription: string;
   assignedUsers: string[]; // Array of user IDs
+  teamId: string;
 }
 
 export interface Project {
@@ -93,6 +94,18 @@ export interface Project {
   projectDescription: string;
   assignedUsers: string[]; // Array of user IDs
   createdBy: string; // Admin user ID
+  teamId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Team {
+  _id: string;
+  teamName: string;
+  description?: string;
+  isPrivate: boolean;
+  members: string[];
+  createdBy: string;
   createdAt: Date;
   updatedAt: Date;
 }

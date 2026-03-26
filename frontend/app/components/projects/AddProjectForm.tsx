@@ -17,6 +17,7 @@ export default function AddProjectForm({ users, onSuccess }: AddProjectFormProps
     projectName: "",
     projectDescription: "",
     assignedUsers: [],
+    teamId: "",
   });
   const [error, setError] = useState("");
 
@@ -34,7 +35,7 @@ export default function AddProjectForm({ users, onSuccess }: AddProjectFormProps
     mutationFn: projectsApi.createProject,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
-      setFormData({ projectName: "", projectDescription: "", assignedUsers: [] });
+      setFormData({ projectName: "", projectDescription: "", assignedUsers: [], teamId: "" });
       setError("");
       onSuccess?.();
     },
@@ -59,6 +60,11 @@ export default function AddProjectForm({ users, onSuccess }: AddProjectFormProps
 
     if (formData.assignedUsers.length === 0) {
       setError("Please select at least one user to assign to the project");
+      return;
+    }
+
+    if (!formData.teamId.trim()) {
+      setError("Team ID is required");
       return;
     }
 
@@ -110,6 +116,19 @@ export default function AddProjectForm({ users, onSuccess }: AddProjectFormProps
 
       <div>
         <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+          Team ID
+        </label>
+        <input
+          type="text"
+          value={formData.teamId}
+          onChange={(e) => setFormData({ ...formData, teamId: e.target.value })}
+          className="claude-input w-full"
+          placeholder="Enter team ID"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
           Assign Users <span className="text-[var(--status-error)]">*</span>
         </label>
         <div className="border border-[var(--border-subtle)] rounded-lg p-4 max-h-48 overflow-y-auto bg-[var(--bg-canvas)]">
@@ -120,26 +139,26 @@ export default function AddProjectForm({ users, onSuccess }: AddProjectFormProps
               {users
                 .filter((user) => user._id !== currentUserId)
                 .map((user) => (
-                <label key={user._id} className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={formData.assignedUsers.includes(user._id)}
-                    onChange={() => toggleUser(user._id)}
-                    className="w-4 h-4 rounded border-[var(--border-subtle)] text-[var(--accent)] focus:ring-[var(--accent)] focus:ring-offset-0"
-                  />
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] text-xs font-medium flex items-center justify-center">
-                      {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+                  <label key={user._id} className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={formData.assignedUsers.includes(user._id)}
+                      onChange={() => toggleUser(user._id)}
+                      className="w-4 h-4 rounded border-[var(--border-subtle)] text-[var(--accent)] focus:ring-[var(--accent)] focus:ring-offset-0"
+                    />
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] text-xs font-medium flex items-center justify-center">
+                        {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+                      </div>
+                      <span className="text-sm text-[var(--text-primary)]">
+                        {user.fullName}
+                      </span>
+                      <span className="text-xs text-[var(--text-muted)]">
+                        ({user.email})
+                      </span>
                     </div>
-                    <span className="text-sm text-[var(--text-primary)]">
-                      {user.fullName}
-                    </span>
-                    <span className="text-xs text-[var(--text-muted)]">
-                      ({user.email})
-                    </span>
-                  </div>
-                </label>
-              ))}
+                  </label>
+                ))}
             </div>
           )}
         </div>

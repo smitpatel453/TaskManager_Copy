@@ -7,6 +7,7 @@ import { CORS_CONFIG } from "./middlewares/cors.js";
 import authRoutes from "./routes/auth.routes.js";
 import tasksRoutes from "./routes/tasks.routes.js";
 import projectsRoutes from "./routes/projects.routes.js";
+import teamsRoutes from "./routes/teams.routes.js";
 import usersRoutes from "./routes/users.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import channelsRoutes from "./routes/channels.routes.js";
@@ -42,11 +43,12 @@ export function createApp() {
       next(error);
     }
   });
-  
+
   // Routes
   app.use("/api/auth", authRateLimiter, authRoutes);
   app.use("/api/tasks", tasksRoutes);
   app.use("/api/projects", projectsRoutes);
+  app.use("/api/teams", teamsRoutes);
   app.use("/api/users", usersRoutes);
   app.use("/api/dashboard", dashboardRoutes);
   app.use("/api/channels", channelsRoutes);
