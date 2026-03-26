@@ -3,7 +3,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import { projectsApi } from "../../../src/api/projects.api";
-import type { Project } from "../../../src/types/project";  
+import type { Project } from "../../../src/types/project";
+import { SkeletonProjectsTable } from "../Skeleton";
 
 export default function ProjectsClient({ userRole }: { userRole?: "admin" | "user" }) {
   const queryClient = useQueryClient();
@@ -148,13 +149,18 @@ export default function ProjectsClient({ userRole }: { userRole?: "admin" | "use
 
   if (projectsLoading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="flex items-center gap-3 text-[var(--text-tertiary)]">
-          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
-          <span className="text-sm">Loading projects...</span>
+      <div className="space-y-0">
+        <div className="border-b border-[var(--border-subtle)] pb-0 -mx-6 px-6 -mt-6 pt-4 bg-[var(--bg-canvas)]">
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-5 h-5 rounded bg-green-600 opacity-30" />
+            <div className="skeleton skeleton-lg" style={{ width: 120 }} />
+          </div>
+        </div>
+        <div className="mt-4 border border-[var(--border-subtle)] rounded-lg bg-[var(--bg-canvas)] shadow-sm">
+          <div className="grid grid-cols-[1fr_180px_160px_120px] gap-2 items-center px-8 py-2.5 border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide rounded-t-lg">
+            <div>Project Name</div><div>Created By</div><div>Assigned Users</div><div>Created</div>
+          </div>
+          <SkeletonProjectsTable rows={6} />
         </div>
       </div>
     );

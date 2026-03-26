@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { AuthService } from "../services/auth.service.js";
+import { isStrongPassword, STRONG_PASSWORD_MESSAGE } from "../shared/validation.js";
 
 export class AuthController {
   private authService: AuthService;
@@ -15,8 +16,8 @@ export class AuthController {
       res.status(200).json(result);
     } catch (error) {
       console.error("Auth login error:", error);
-      if (error instanceof Error && (error.message.includes("not found") || error.message.includes("Invalid password"))) {
-        res.status(401).json({ error: error.message });
+      if (error instanceof Error && error.message === "Invalid credentials") {
+        res.status(401).json({ error: "Invalid credentials" });
       } else {
         res.status(500).json({ error: "Server error" });
       }
@@ -49,9 +50,9 @@ export class AuthController {
         return;
       }
 
-      // Validate password length
-      if (body.newPassword.length < 6) {
-        res.status(400).json({ error: "New password must be at least 6 characters" });
+      // Validate password strength
+      if (!isStrongPassword(body.newPassword)) {
+        res.status(400).json({ error: STRONG_PASSWORD_MESSAGE });
         return;
       }
 

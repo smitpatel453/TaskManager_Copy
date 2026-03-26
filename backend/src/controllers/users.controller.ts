@@ -2,17 +2,7 @@ import { Request, Response } from "express";
 import { UsersService } from "../services/users.service.js";
 import type { CreateUserRequest } from "../shared/types/index.js";
 import { ForbiddenError, BadRequestError, NotFoundError } from "../shared/types/index.js";
-
-// Helper function to validate password strength
-function isStrongPassword(password: string): boolean {
-    // At least 8 characters, 1 uppercase, 1 lowercase, 1 digit, 1 special char
-    const hasLength = password.length >= 8;
-    const hasUppercase = /[A-Z]/.test(password);
-    const hasLowercase = /[a-z]/.test(password);
-    const hasDigit = /\d/.test(password);
-    const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
-    return hasLength && hasUppercase && hasLowercase && hasDigit && hasSpecial;
-}
+import { isStrongPassword, STRONG_PASSWORD_MESSAGE } from "../shared/validation.js";
 
 // Helper function to validate email format
 function isValidEmail(email: string): boolean {
@@ -67,7 +57,7 @@ export class UsersController {
             }
 
             if (!isStrongPassword(body.password)) {
-                res.status(400).json({ error: "password must be at least 8 characters and include uppercase, lowercase, number, and special character" });
+                res.status(400).json({ error: STRONG_PASSWORD_MESSAGE });
                 return;
             }
 

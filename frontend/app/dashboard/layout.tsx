@@ -2,6 +2,7 @@
 
 import Sidebar from "../components/Sidebar";
 import { useEffect, useState, useRef } from "react";
+import { usePathname } from "next/navigation";
 
 export default function DashboardLayout({
   children,
@@ -10,6 +11,10 @@ export default function DashboardLayout({
 }) {
   const [userRole, setUserRole] = useState<"admin" | "user" | undefined>();
   const hasInitialized = useRef(false);
+  const pathname = usePathname();
+
+  // Channel pages need to fill full height with no extra padding
+  const isChannelPage = pathname?.startsWith("/dashboard/channels/");
 
   useEffect(() => {
     if (hasInitialized.current) return;
@@ -36,12 +41,16 @@ export default function DashboardLayout({
   return (
     <div className="flex h-screen w-full bg-[var(--bg-canvas)] text-[13px] font-sans text-[var(--text-primary)] overflow-hidden">
       <Sidebar userRole={userRole} />
-      <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-canvas)] relative">
+      <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-canvas)] relative overflow-hidden">
         {/* Main Content */}
-        <main className="flex-1 overflow-auto ck-scrollbar">
-          <div className="p-6">
-            {children}
-          </div>
+        <main className="flex-1 overflow-hidden">
+          {isChannelPage ? (
+            children
+          ) : (
+            <div className="h-full overflow-auto ck-scrollbar p-6">
+              {children}
+            </div>
+          )}
         </main>
       </div>
     </div>

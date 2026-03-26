@@ -1,26 +1,15 @@
-const allowedOrigins = [
-  process.env.FRONTEND_URL || "http://localhost:3000",
+import { ENV } from "../config/env.js";
+
+const allowedOrigins: string[] = [
   "http://localhost:3000",
-  "http://192.168.2.200:3000",
+  ...(ENV.FRONTEND_URL ? [ENV.FRONTEND_URL] : []),
 ];
 
 export const CORS_CONFIG = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
-    // During development, allow all localhost and local network origins
-    if (origin.startsWith('http://localhost') || 
-        origin.startsWith('http://127.0.0.1') ||
-        origin.match(/^http:\/\/192\.168\.\d+\.\d+:\d+$/)) {
-      return callback(null, true);
-    }
-    
-    // Allow all Vercel deployment URLs
-    if (origin.endsWith('.vercel.app')) {
-      return callback(null, true);
-    }
-    
+
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {

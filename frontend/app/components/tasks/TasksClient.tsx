@@ -3,12 +3,15 @@
 import { useEffect, useState, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
+import { Bars4Icon, ViewColumnsIcon } from "@heroicons/react/24/outline";
 import TaskTable from "./TaskTable";
+import { SkeletonTasksList } from "../Skeleton";
 
 export default function TasksClient() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "board">("list");
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
 
@@ -59,13 +62,17 @@ export default function TasksClient() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="flex items-center gap-3 text-[var(--text-tertiary)]">
-          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
-          <span className="text-sm">Loading...</span>
+      <div className="space-y-0">
+        <div className="border-b border-[var(--border-subtle)] pb-0 -mx-6 px-6 -mt-6 pt-4 bg-[var(--bg-canvas)]">
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-5 h-5 rounded bg-blue-600 opacity-30" />
+            <div className="skeleton skeleton-lg" style={{ width: 100 }} />
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--text-muted)]"><polyline points="9 18 15 12 9 6" /></svg>
+            <div className="skeleton skeleton-lg" style={{ width: 80 }} />
+          </div>
+        </div>
+        <div className="mt-4 border border-[var(--border-subtle)] rounded-lg bg-[var(--bg-canvas)] shadow-sm">
+          <SkeletonTasksList rows={8} />
         </div>
       </div>
     );
@@ -107,16 +114,33 @@ export default function TasksClient() {
           <span className="font-semibold text-[var(--text-primary)] text-[16px]">{getBreadcrumbLabel()}</span>
         </div>
 
-        {/* View Nav Tabs removed */}
+        {/* View Nav Tabs */}
+        <div className="flex items-center gap-6 mt-4 -mb-[1px]">
+          <button 
+            onClick={() => setViewMode("list")} 
+            className={`pb-3 text-[13px] font-medium border-b-2 flex items-center gap-2 transition-colors ${viewMode === 'list' ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+          >
+            <Bars4Icon className="w-4 h-4" />
+            List
+          </button>
+          <button 
+            onClick={() => setViewMode("board")} 
+            className={`pb-3 text-[13px] font-medium border-b-2 flex items-center gap-2 transition-colors ${viewMode === 'board' ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+          >
+            <ViewColumnsIcon className="w-4 h-4" />
+            Board
+          </button>
+        </div>
       </div>
 
-      {/* Task Table */}
+      {/* Task Content */}
       <div className="mt-4">
         <TaskTable 
           initialFilter={filterParam} 
           projectFilter={projectParam} 
           assignedToFilter={assignedToParam || undefined}
           readOnly={!filterParam && !projectParam}
+          viewMode={viewMode}
         />
       </div>
     </div>

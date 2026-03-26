@@ -1,12 +1,18 @@
-import mongoose, { Schema, Document, Model } from "mongoose";
+import mongoose, { Schema, Document, Model, Types } from "mongoose";
 import type { DetailBlock } from "../shared/types/index.js";
+
+export type TaskStatus = "to-do" | "in-progress" | "completed";
+export type TaskPriority = "low" | "normal" | "high" | "urgent";
 
 export interface TaskDocument extends Document {
     userId: mongoose.Types.ObjectId;
     taskName: string;
+    description?: string;
     hours: number;
     details: DetailBlock[];
-    status: "to-do" | "in-progress" | "completed";
+    status: TaskStatus;
+    priority?: TaskPriority;
+    tags?: string[];
     projectId?: mongoose.Types.ObjectId;
     assignedTo?: mongoose.Types.ObjectId;
     startDate?: Date;
@@ -21,7 +27,9 @@ export interface TaskListItem {
     createdAt: Date;
     detailsCount: number;
     no: number;
-    status: "to-do" | "in-progress" | "completed";
+    status: TaskStatus;
+    priority?: TaskPriority;
+    tags?: string[];
     projectId?: string;
     projectName?: string;
     assignedTo?: string;
@@ -44,6 +52,15 @@ const taskSchema = new Schema<TaskDocument>(
         hours: { type: Number, required: true },
         details: { type: [detailBlockSchema], default: [] },
         status: { type: String, enum: ["to-do", "in-progress", "completed"], default: "to-do" },
+        priority: {
+            type: String,
+            enum: ["low", "normal", "high", "urgent"],
+            default: undefined,
+        },
+        tags: [{
+            type: String,
+            trim: true
+        }],
         projectId: { type: Schema.Types.ObjectId, ref: "projects", index: true },
         assignedTo: { type: Schema.Types.ObjectId, ref: "users", index: true },
         startDate: { type: Date },

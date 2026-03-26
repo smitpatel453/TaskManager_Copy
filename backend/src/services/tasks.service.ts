@@ -132,16 +132,24 @@ export class TasksService {
 
     const status: TaskStatus = isValidStatus(data.status) ? data.status : "to-do";
 
+    // Validate and clean tags
+    const cleanedTags: string[] = Array.isArray(data.tags)
+      ? data.tags.map(tag => String(tag).trim()).filter(tag => tag.length > 0)
+      : [];
+
     // Create task document
     const taskData: any = {
       userId: new mongoose.Types.ObjectId(userId),
       taskName: data.taskName.trim(),
+      description: data.description?.trim(),
       details: cleanedDetails,
       hours: data.hours,
       status,
       assignedTo: new mongoose.Types.ObjectId(assignedToUser),
       startDate: startDate ?? undefined,
       dueDate: dueDate ?? undefined,
+      priority: data.priority,
+      tags: cleanedTags,
       createdAt: new Date(),
     };
 

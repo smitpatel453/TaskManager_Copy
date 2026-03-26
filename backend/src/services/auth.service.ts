@@ -22,13 +22,13 @@ export class AuthService {
     // Find user by email
     const user = await this.userModel.findByEmail(normalizedEmail);
     if (!user) {
-      throw new Error("User not found");
+      throw new Error("Invalid credentials");
     }
 
     // Compare passwords
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw new Error("Invalid password");
+      throw new Error("Invalid credentials");
     }
 
     // Generate JWT token

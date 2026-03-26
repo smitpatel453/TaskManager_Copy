@@ -10,9 +10,11 @@ export type TaskStatus = "to-do" | "in-progress" | "completed";
 export interface Task {
   _id: string;
   taskName: string;
+  description?: string;
   hours: number;
   details: DetailBlock[];
   status: TaskStatus;
+  priority?: "low" | "normal" | "high" | "urgent";
   projectId?: string;
   assignedTo?: string;
   startDate?: string;
@@ -23,9 +25,11 @@ export interface Task {
 
 export interface CreateTaskRequest {
   taskName: string;
+  description?: string;
   hours: number;
   details: DetailBlock[];
   status: TaskStatus;
+  priority?: "low" | "normal" | "high" | "urgent";
   projectId?: string;
   assignedTo?: string;
   startDate?: string;

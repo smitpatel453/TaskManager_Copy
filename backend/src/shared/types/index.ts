@@ -30,9 +30,12 @@ export type TaskStatus = "to-do" | "in-progress" | "completed";
 
 export interface CreateTaskRequest {
   taskName: string;
+  description?: string;
   hours: number;
   details: DetailBlock[];
   status: TaskStatus;
+  priority?: "low" | "normal" | "high" | "urgent";
+  tags?: string[];
   projectId?: string;
   assignedTo?: string; // User ID to assign the task
   startDate?: string;
@@ -42,9 +45,12 @@ export interface CreateTaskRequest {
 export interface Task {
   _id: string;
   taskName: string;
+  description?: string;
   hours: number;
   details: DetailBlock[];
   status: TaskStatus;
+  priority?: "low" | "normal" | "high" | "urgent";
+  tags?: string[];
   projectId?: string;
   assignedTo?: string; // User ID the task is assigned to
   startDate?: string;

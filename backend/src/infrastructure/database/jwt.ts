@@ -1,10 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
-import dotenv from "dotenv";
-dotenv.config();
+import { ENV } from "../../config/env.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "";
-
-const secret = new TextEncoder().encode(JWT_SECRET);
+const secret = new TextEncoder().encode(ENV.JWT_SECRET);
 
 export type JWTPayload = {
     userId: string;
