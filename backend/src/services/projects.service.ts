@@ -1,14 +1,17 @@
 import mongoose from "mongoose";
 import { ProjectModel } from "../models/project.model.js";
+import { TeamModel } from "../models/team.model.js";
 import { UserModel } from "../models/user.model.js";
 import type { CreateProjectRequest } from "../shared/types/index.js";
 
 export class ProjectsService {
     private projectModel: ProjectModel;
+    private teamModel: TeamModel;
     private userModel: UserModel;
 
     constructor() {
         this.projectModel = new ProjectModel();
+        this.teamModel = new TeamModel();
         this.userModel = new UserModel();
     }
 
@@ -60,12 +63,8 @@ export class ProjectsService {
     /**
      * Create a new project (admin only)
      */
-    async createProject(data: CreateProjectRequest, adminId: string): Promise<any> {
-        // Verify admin access
-        const isAdmin = await this.isUserAdmin(adminId);
-        if (!isAdmin) {
-            throw new Error("Only admins can create projects");
-        }
+    async createProject(data: CreateProjectRequest, creatorId: string): Promise<any> {
+        const isAdmin = await this.isUserAdmin(creatorId);
 
         // Validate project name
         if (!data.projectName || typeof data.projectName !== "string") {
@@ -74,6 +73,24 @@ export class ProjectsService {
 
         if (data.projectName.trim().length === 0) {
             throw new Error("Project name cannot be empty");
+        }
+
+        if (!data.teamId || !mongoose.Types.ObjectId.isValid(data.teamId)) {
+            throw new Error("Valid teamId is required");
+        }
+
+        const team = await this.teamModel.findById(data.teamId);
+        if (!team) {
+            throw new Error("Selected team does not exist");
+        }
+
+        const canCreateInTeam =
+            isAdmin ||
+            team.createdBy.toString() === creatorId ||
+            (team.members || []).some((member) => member.toString() === creatorId);
+
+        if (!canCreateInTeam) {
+            throw new Error("You do not have access to create projects in this team");
         }
 
         const projectNameExists = await this.projectModel.existsByName(data.projectName);
@@ -97,8 +114,9 @@ export class ProjectsService {
         const projectData = {
             projectName: data.projectName.trim(),
             projectDescription: data.projectDescription.trim(),
+            teamId: new mongoose.Types.ObjectId(data.teamId),
             assignedUsers: (data.assignedUsers || []).map((id) => new mongoose.Types.ObjectId(id)),
-            createdBy: new mongoose.Types.ObjectId(adminId),
+            createdBy: new mongoose.Types.ObjectId(creatorId),
         };
 
         const result = await this.projectModel.create(projectData);
@@ -109,6 +127,7 @@ export class ProjectsService {
                 _id: result.insertedId,
                 projectName: result.project.projectName,
                 projectDescription: result.project.projectDescription,
+                teamId: result.project.teamId,
                 assignedUsers: result.project.assignedUsers,
                 createdBy: result.project.createdBy,
                 createdAt: result.project.createdAt,
@@ -135,6 +154,10 @@ export class ProjectsService {
                 _id: project._id.toString(),
                 projectName: project.projectName,
                 projectDescription: project.projectDescription,
+                team: {
+                    _id: (project.teamId as any)?._id?.toString() || project.teamId,
+                    teamName: (project.teamId as any)?.teamName || "",
+                },
                 assignedUsers: (project.assignedUsers as any[]).map((user: any) => ({
                     _id: user._id?.toString() || user,
                     firstName: user.firstName,
@@ -171,6 +194,10 @@ export class ProjectsService {
                 _id: project._id.toString(),
                 projectName: project.projectName,
                 projectDescription: project.projectDescription,
+                team: {
+                    _id: (project.teamId as any)?._id?.toString() || project.teamId,
+                    teamName: (project.teamId as any)?.teamName || "",
+                },
                 assignedUsers: (project.assignedUsers as any[]).map((user: any) => ({
                     _id: user._id?.toString() || user,
                     firstName: user.firstName,

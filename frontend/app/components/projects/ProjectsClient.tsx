@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import { projectsApi } from "../../../src/api/projects.api";
+import { teamsApi } from "../../../src/api/teams.api";
 import type { Project } from "../../../src/types/project";
 import { SkeletonProjectsTable } from "../Skeleton";
 
@@ -15,6 +16,7 @@ export default function ProjectsClient({ userRole }: { userRole?: "admin" | "use
   const [isAdding, setIsAdding] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectDesc, setNewProjectDesc] = useState("");
+  const [newProjectTeamId, setNewProjectTeamId] = useState("");
   const [newProjectUsers, setNewProjectUsers] = useState<string[]>([]);
   const [usersDropdownOpen, setUsersDropdownOpen] = useState(false);
   const [projectError, setProjectError] = useState<string>("");
@@ -56,6 +58,13 @@ export default function ProjectsClient({ userRole }: { userRole?: "admin" | "use
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: teamsData } = useQuery({
+    queryKey: ["teams"],
+    queryFn: teamsApi.getTeams,
+    enabled: isAdding,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const createProjectMutation = useMutation({
     mutationFn: projectsApi.createProject,
     onSuccess: () => {
@@ -63,6 +72,7 @@ export default function ProjectsClient({ userRole }: { userRole?: "admin" | "use
       setIsAdding(false);
       setNewProjectName("");
       setNewProjectDesc("");
+      setNewProjectTeamId("");
       setNewProjectUsers([]);
       setProjectError("");
     },
@@ -74,61 +84,67 @@ export default function ProjectsClient({ userRole }: { userRole?: "admin" | "use
     },
   });
 
- const handleCreateProject = () => {
-  setProjectError("");
-  
-  if (!newProjectName.trim()) {
-    setProjectError("Project name is required");
-    return;
-  }
-  if (!newProjectDesc.trim()) {
-    setProjectError("Description is required");
-    return;
-  }
+  const handleCreateProject = () => {
+    setProjectError("");
 
-  if (newProjectUsers.length === 0) {
-    setProjectError("Please select at least one user to assign to the project");
-    return;
-  }
-
-  // Check if admin is trying to assign the project to themselves
-  if (isAdmin) {
-    // Get current user ID from storage
-    const userId = currentUserId || getUserIdFromStorage();
-
-    if (!userId) {
-      setProjectError("Unable to verify current user. Please refresh the page.");
+    if (!newProjectName.trim()) {
+      setProjectError("Project name is required");
       return;
     }
-    
-    if (newProjectUsers.includes(userId)) {
+    if (!newProjectDesc.trim()) {
+      setProjectError("Description is required");
+      return;
+    }
+
+    if (!newProjectTeamId) {
+      setProjectError("Please select a team");
+      return;
+    }
+
+    if (newProjectUsers.length === 0) {
+      setProjectError("Please select at least one user to assign to the project");
+      return;
+    }
+
+    // Check if admin is trying to assign the project to themselves
+    if (isAdmin) {
+      // Get current user ID from storage
+      const userId = currentUserId || getUserIdFromStorage();
+
+      if (!userId) {
+        setProjectError("Unable to verify current user. Please refresh the page.");
+        return;
+      }
+
+      if (newProjectUsers.includes(userId)) {
+        setProjectError("You cannot assign a project to yourself");
+        return;
+      }
+    }
+
+    createProjectMutation.mutate({
+      projectName: newProjectName,
+      projectDescription: newProjectDesc,
+      teamId: newProjectTeamId,
+      assignedUsers: newProjectUsers,
+    });
+  };
+
+  const toggleUser = (userId: string) => {
+    // Get current user ID
+    const myUserId = currentUserId || getUserIdFromStorage();
+
+    // Prevent admin from selecting themselves
+    if (isAdmin && userId === myUserId) {
       setProjectError("You cannot assign a project to yourself");
       return;
     }
-  }
 
-  createProjectMutation.mutate({
-    projectName: newProjectName,
-    projectDescription: newProjectDesc,
-    assignedUsers: newProjectUsers,
-  });
-};
-
- const toggleUser = (userId: string) => {
-  // Get current user ID
-  const myUserId = currentUserId || getUserIdFromStorage();
-
-  // Prevent admin from selecting themselves
-  if (isAdmin && userId === myUserId) {
-    setProjectError("You cannot assign a project to yourself");
-    return;
-  }
-  
-  setProjectError("");
-  setNewProjectUsers(prev =>
-    prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
-  );
-};
+    setProjectError("");
+    setNewProjectUsers(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
+  };
 
   // Click outside handler
   useEffect(() => {
@@ -168,6 +184,7 @@ export default function ProjectsClient({ userRole }: { userRole?: "admin" | "use
 
   const projects = projectsData?.data || [];
   const allUsers = usersData?.data || [];
+  const teams = teamsData?.data || [];
   const users = allUsers.filter(u => u._id !== currentUserId);
 
   return (
@@ -395,6 +412,16 @@ export default function ProjectsClient({ userRole }: { userRole?: "admin" | "use
                   className="bg-transparent outline-none text-[11px] text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] border border-[var(--border-subtle)] rounded-md px-2 py-1 w-full"
                   onKeyDown={(e) => e.key === 'Enter' && handleCreateProject()}
                 />
+                <select
+                  value={newProjectTeamId}
+                  onChange={(e) => setNewProjectTeamId(e.target.value)}
+                  className="bg-transparent outline-none text-[11px] text-[var(--text-secondary)] border border-[var(--border-subtle)] rounded-md px-2 py-1 w-full"
+                >
+                  <option value="">Select team</option>
+                  {teams.map((team) => (
+                    <option key={team._id} value={team._id}>{team.teamName}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Created By */}
@@ -470,7 +497,7 @@ export default function ProjectsClient({ userRole }: { userRole?: "admin" | "use
           ) : (
             (projects.length > 0 || isAdding) && (
               <button
-                onClick={() => { setIsAdding(true); setNewProjectName(""); setNewProjectDesc(""); setNewProjectUsers([]); setProjectError(""); }}
+                onClick={() => { setIsAdding(true); setNewProjectName(""); setNewProjectDesc(""); setNewProjectTeamId(""); setNewProjectUsers([]); setProjectError(""); }}
                 className="w-full flex items-center gap-2 px-8 py-3 text-[13px] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-all border-t border-transparent hover:border-[var(--border-subtle)] rounded-b-lg"
               >
                 <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" className="octicon octicon-repo" fill="currentColor">

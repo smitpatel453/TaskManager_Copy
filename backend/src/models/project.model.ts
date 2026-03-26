@@ -3,6 +3,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 export interface ProjectDocument extends Document {
     projectName: string;
     projectDescription: string;
+    teamId: mongoose.Types.ObjectId;
     assignedUsers: mongoose.Types.ObjectId[];
     createdBy: mongoose.Types.ObjectId;
     createdAt: Date;
@@ -13,6 +14,7 @@ const projectSchema = new Schema<ProjectDocument>(
     {
         projectName: { type: String, required: true, trim: true },
         projectDescription: { type: String, required: true, trim: true },
+        teamId: { type: Schema.Types.ObjectId, ref: "teams", required: true, index: true },
         assignedUsers: {
             type: [Schema.Types.ObjectId],
             ref: "users",
@@ -32,6 +34,7 @@ projectSchema.index({ assignedUsers: 1 }); // For finding projects by assigned u
 projectSchema.index({ projectName: 1 }); // For searching by project name
 projectSchema.index({ createdAt: -1 }); // For sorting by creation date
 projectSchema.index({ createdBy: 1, createdAt: -1 }); // Compound index for user's projects sorted by date
+projectSchema.index({ teamId: 1 }); // For listing projects by team
 
 const Project = mongoose.models.projects || mongoose.model<ProjectDocument>("projects", projectSchema);
 
@@ -68,14 +71,22 @@ export class ProjectModel {
      */
     async findById(projectId: string): Promise<ProjectDocument | null> {
         this.validateObjectId(projectId, "projectId");
-        return this.model.findById(projectId).populate("assignedUsers", "firstName lastName email");
+        return this.model
+            .findById(projectId)
+            .populate("assignedUsers", "firstName lastName email")
+            .populate("teamId", "teamName");
     }
 
     /**
      * Find all projects (admin view)
      */
     async findAll(): Promise<ProjectDocument[]> {
-        return this.model.find().populate("assignedUsers", "firstName lastName email").populate("createdBy", "firstName lastName email").sort({ createdAt: -1 });
+        return this.model
+            .find()
+            .populate("assignedUsers", "firstName lastName email")
+            .populate("createdBy", "firstName lastName email")
+            .populate("teamId", "teamName")
+            .sort({ createdAt: -1 });
     }
 
     /**
@@ -87,6 +98,7 @@ export class ProjectModel {
             .find({ assignedUsers: new mongoose.Types.ObjectId(userId) })
             .populate("assignedUsers", "firstName lastName email")
             .populate("createdBy", "firstName lastName email")
+            .populate("teamId", "teamName")
             .sort({ createdAt: -1 });
     }
 
@@ -97,7 +109,8 @@ export class ProjectModel {
         this.validateObjectId(projectId, "projectId");
         return this.model.findByIdAndUpdate(projectId, updateData, { new: true, runValidators: true })
             .populate("assignedUsers", "firstName lastName email")
-            .populate("createdBy", "firstName lastName email");
+            .populate("createdBy", "firstName lastName email")
+            .populate("teamId", "teamName");
     }
 
     /**

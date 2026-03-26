@@ -56,8 +56,10 @@ router.use(authMiddleware);
 router.get("/users/all", (req, res) => projectsController.getAllUsers(req, res));
 router.get("/my-projects", (req, res) => projectsController.getUserProjects(req, res));
 
+// Team member/admin create route
+router.post("/", (req, res) => projectsController.createProject(req, res));
+
 // Admin only routes
-router.post("/", adminMiddleware, (req, res) => projectsController.createProject(req, res));
 router.get("/", adminMiddleware, (req, res) => projectsController.getAllProjects(req, res));
 
 export default router;

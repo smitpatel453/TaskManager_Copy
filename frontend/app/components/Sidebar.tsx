@@ -7,6 +7,7 @@ import axios from "axios";
 import { authApi } from "../../src/api/auth.api";
 import { channelsApi } from "../../src/api/channels.api";
 import { projectsApi } from "../../src/api/projects.api";
+import { teamsApi } from "../../src/api/teams.api";
 import {
   HomeIcon,
   UsersIcon,
@@ -35,6 +36,19 @@ type StoredChannel = {
   isPrivate?: boolean;
   createdBy?: string;
   joinedMemberIds?: string[];
+};
+
+type SidebarProject = {
+  _id: string;
+  projectName: string;
+  team?: { _id: string; teamName: string };
+  assignedUsers?: Array<{ _id: string; firstName: string; lastName: string }>;
+};
+
+type GroupedProjects = {
+  id: string;
+  name: string;
+  projects: SidebarProject[];
 };
 
 interface SidebarProps {
@@ -83,13 +97,7 @@ const navItems = [
         <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
       </svg>
     ),
-  },
-  {
-    id: "dashboard",
-    label: "Dashboard",
-    icon: <ChartBarIcon width={20} height={20} strokeWidth={1.8} />,
-    href: "/dashboard",
-    adminOnly: true,
+    href: "/dashboard/teams",
   },
   {
     id: "projects",
@@ -175,42 +183,6 @@ const TaskFilters = memo(function TaskFilters({
   );
 });
 
-// ─── Projects List ────────────────────────────────────────────
-const ProjectsList = memo(function ProjectsList({
-  projects,
-  pathname,
-  onNavigate,
-  loading,
-}: {
-  projects: Array<{ _id: string; projectName: string; assignedUsers?: Array<{ _id: string; firstName: string; lastName: string }> }>;
-  pathname: string;
-  onNavigate: (url: string) => void;
-  loading?: boolean;
-}) {
-  const searchParams = useSearchParams();
-  if (loading) return <SkeletonSidebarItems count={3} />;
-  if (projects.length === 0) {
-    return (
-      <div className="flex items-stretch">
-        <TreeConnector isLast />
-        <div className="px-2 py-2 text-[11px] text-[var(--text-muted)]">No projects assigned</div>
-      </div>
-    );
-  }
-  return (
-    <>
-      {projects.map((project, idx) => (
-        <div key={project._id} className="flex items-stretch">
-          <TreeConnector isLast={idx === projects.length - 1} />
-          <div className="flex-1 min-w-0">
-            <ProjectSidebarItem project={project} pathname={pathname} searchParams={searchParams} onNavigate={onNavigate} />
-          </div>
-        </div>
-      ))}
-    </>
-  );
-});
-
 // ─── Tree connector ───────────────────────────────────────────
 function TreeConnector({ isLast }: { isLast: boolean }) {
   const lineClass = "bg-[var(--border-default)] opacity-50";
@@ -264,90 +236,10 @@ function ContentPanelItem({
   );
 }
 
-// ─── GitHub folder icon ───────────────────────────────────────
-const GitHubFolderIcon = ({ open }: { open?: boolean }) => (
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className="flex-shrink-0">
-    {open ? (
-      <path d="M.513 1.513A1.75 1.75 0 0 1 1.75 1h3.5c.63 0 1.238.223 1.715.625L7.94 2.44A.25.25 0 0 0 8.104 2.5H13.25A1.75 1.75 0 0 1 15 4.25v.757c.244.153.45.38.573.669l.75 2.25A1.75 1.75 0 0 1 14.663 10H1.337a1.75 1.75 0 0 1-1.66-2.074l.75-2.25A1.75 1.75 0 0 1 1 5.007V2.75c0-.464.184-.91.513-1.237ZM1.75 2.5a.25.25 0 0 0-.25.25v2.257l.61-.183A1.75 1.75 0 0 1 2.64 4.75h10.72a1.75 1.75 0 0 1 .53.082l.61.183V4.25a.25.25 0 0 0-.25-.25H8.104a1.75 1.75 0 0 1-1.164-.44L5.965 2.69a.762.762 0 0 0-.49-.19h-3.5ZM14.663 8.5H1.337a.25.25 0 0 0-.237-.296l.75-2.25a.25.25 0 0 1 .237-.204h11.826a.25.25 0 0 1 .237.204l.75 2.25a.25.25 0 0 1-.237.296Z" />
-    ) : (
-      <path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75ZM1.5 2.75a.25.25 0 0 1 .25-.25H5c.1 0 .2.05.264.113l.943 1.257c.335.447.843.704 1.383.75l-.001.065v.065H1.5v-2Zm0 3.5h13v7a.25.25 0 0 1-.25.25H1.75a.25.25 0 0 1-.25-.25v-7Z" />
-    )}
-  </svg>
-);
-
-// ─── Project sidebar item ─────────────────────────────────────
-function ProjectSidebarItem({
-  project, pathname, searchParams, onNavigate,
-}: {
-  project: { _id: string; projectName: string; assignedUsers?: Array<{ _id: string; firstName: string; lastName: string }> };
-  pathname: string;
-  searchParams: URLSearchParams;
-  onNavigate: (url: string) => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const assignedUsers = project.assignedUsers || [];
-  const isActive = pathname === "/dashboard/tasks" && searchParams.get("project") === project._id;
-
-  return (
-    <div className="select-none">
-      <div className={`flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-[var(--bg-surface-2)] group cursor-pointer transition-all ${isActive ? "bg-[var(--accent-light)] text-[var(--accent)]" : "text-[var(--text-secondary)]"
-        }`}>
-        <button
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpanded(!expanded); }}
-          className="p-0 mr-1 text-[var(--text-muted)] hover:text-[var(--text-secondary)] flex-shrink-0"
-        >
-          <ChevronRightIcon className={`w-3 h-3 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`} />
-        </button>
-        <div onClick={() => onNavigate(`/dashboard/tasks?project=${project._id}`)} className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
-          <span className={`flex-shrink-0 ${isActive ? "text-[var(--accent)]" : "text-[var(--text-muted)]"}`}>
-            <GitHubFolderIcon open={expanded} />
-          </span>
-          <span className={`truncate text-[12px] font-medium ${isActive ? "text-[var(--accent)]" : ""}`}>
-            {project.projectName}
-          </span>
-        </div>
-        {assignedUsers.length > 0 && (
-          <span className="text-[10px] text-[var(--text-muted)] bg-[var(--bg-surface-2)] px-1.5 py-0.5 rounded-full flex-shrink-0 ml-1">
-            {assignedUsers.length}
-          </span>
-        )}
-      </div>
-
-      {expanded && (
-        <div className="ml-5 py-0.5">
-          {assignedUsers.length === 0 ? (
-            <div className="flex items-stretch">
-              <TreeConnector isLast />
-              <div className="px-2 py-1 text-[11px] text-[var(--text-muted)] italic">No users assigned</div>
-            </div>
-          ) : (
-            assignedUsers.map((u, idx) => {
-              const isUserActive = pathname === "/dashboard/tasks" && searchParams.get("project") === project._id && searchParams.get("assignedTo") === u._id;
-              return (
-                <div key={u._id} className="flex items-stretch">
-                  <TreeConnector isLast={idx === assignedUsers.length - 1} />
-                  <div
-                    className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-all hover:bg-[var(--bg-surface-2)] ${isUserActive ? "bg-[var(--accent-light)] text-[var(--accent)]" : "text-[var(--text-secondary)]"}`}
-                    onClick={() => onNavigate(`/dashboard/tasks?project=${project._id}&assignedTo=${u._id}`)}
-                  >
-                    <div className="w-4 h-4 rounded-full bg-gray-600 text-white flex items-center justify-center text-[8px] font-bold flex-shrink-0">
-                      {u.firstName?.charAt(0)}
-                    </div>
-                    <span className="truncate text-[11px]">{u.firstName} {u.lastName}</span>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Main Sidebar ─────────────────────────────────────────────
 export default function Sidebar({ userRole }: SidebarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
@@ -365,7 +257,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
 
   // Collapsible sections inside content panel
   const [myTasksOpen, setMyTasksOpen] = useState(false);
-  const [myProjectsOpen, setMyProjectsOpen] = useState(true);
+  const [openTeamIds, setOpenTeamIds] = useState<Record<string, boolean>>({});
 
   // Channels state
   const [channels, setChannels] = useState<StoredChannel[]>([]);
@@ -379,6 +271,16 @@ export default function Sidebar({ userRole }: SidebarProps) {
   const [selectedMembers, setSelectedMembers] = useState<ChannelMember[]>([]);
   const [memberSearch, setMemberSearch] = useState("");
   const [usersLoading, setUsersLoading] = useState(false);
+  const [teamSearch, setTeamSearch] = useState("");
+  const [showAllTeams, setShowAllTeams] = useState(false);
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [newTeamName, setNewTeamName] = useState("");
+  const [newTeamDesc, setNewTeamDesc] = useState("");
+  const [newTeamPrivate, setNewTeamPrivate] = useState(false);
+  const [teamMemberSearch, setTeamMemberSearch] = useState("");
+  const [selectedTeamMemberIds, setSelectedTeamMemberIds] = useState<string[]>([]);
+  const [teamCreateError, setTeamCreateError] = useState("");
+  const [isTeamCreating, setIsTeamCreating] = useState(false);
 
   const [isMounted, setIsMounted] = useState(false);
   const currentUserId = (user as (User & { _id?: string; id?: string }) | null)?._id || (user as (User & { _id?: string; id?: string }) | null)?.id || "";
@@ -391,7 +293,71 @@ export default function Sidebar({ userRole }: SidebarProps) {
     enabled: !!userRole,
     staleTime: 5 * 60 * 1000,
   });
-  const projects = projectsData?.data || [];
+  const projects: SidebarProject[] = (projectsData?.data || []) as SidebarProject[];
+
+  const { data: teamsData, isLoading: teamsLoading } = useQuery({
+    queryKey: ["teams"],
+    queryFn: teamsApi.getTeams,
+    enabled: !!userRole,
+    staleTime: 5 * 60 * 1000,
+  });
+  const teams = teamsData?.data || [];
+
+  const { data: teamUsersData, isLoading: teamUsersLoading } = useQuery({
+    queryKey: ["users-dropdown"],
+    queryFn: projectsApi.getAllUsersForDropdown,
+    enabled: isTeamModalOpen,
+    staleTime: 5 * 60 * 1000,
+  });
+  const teamUsers = teamUsersData?.data || [];
+
+  const normalizedTeamSearch = teamSearch.trim().toLowerCase();
+  const filteredTeams = useMemo(
+    () =>
+      teams.filter((team: { teamName?: string }) =>
+        (team.teamName || "").toLowerCase().includes(normalizedTeamSearch)
+      ),
+    [teams, normalizedTeamSearch]
+  );
+  const hasActiveTeamSearch = normalizedTeamSearch.length > 0;
+  const TEAM_SIDEBAR_LIMIT = 4;
+  const teamsToShow = hasActiveTeamSearch || showAllTeams
+    ? filteredTeams
+    : filteredTeams.slice(0, TEAM_SIDEBAR_LIMIT);
+  const canToggleMoreTeams = !hasActiveTeamSearch && filteredTeams.length > TEAM_SIDEBAR_LIMIT;
+
+  const groupedProjectsByTeam = useMemo<GroupedProjects[]>(() => {
+    const groups = new Map<string, GroupedProjects>();
+
+    for (const team of teams) {
+      groups.set(team._id, { id: team._id, name: team.teamName, projects: [] });
+    }
+
+    for (const project of projects) {
+      const teamId = project.team?._id;
+      const teamName = project.team?.teamName || "Ungrouped";
+
+      if (!teamId) {
+        if (!groups.has("ungrouped")) {
+          groups.set("ungrouped", { id: "ungrouped", name: "Ungrouped", projects: [] });
+        }
+        groups.get("ungrouped")!.projects.push(project);
+        continue;
+      }
+
+      if (!groups.has(teamId)) {
+        groups.set(teamId, { id: teamId, name: teamName, projects: [] });
+      }
+
+      groups.get(teamId)!.projects.push(project);
+    }
+
+    return Array.from(groups.values());
+  }, [projects, teams]);
+
+  const toggleTeamOpen = (teamId: string) => {
+    setOpenTeamIds((prev) => ({ ...prev, [teamId]: !(prev[teamId] ?? true) }));
+  };
 
   useEffect(() => { setIsMounted(true); }, []);
 
@@ -438,6 +404,54 @@ export default function Sidebar({ userRole }: SidebarProps) {
       setAllUsers([]);
     } finally {
       setUsersLoading(false);
+    }
+  };
+
+  const openTeamModal = () => {
+    setTeamCreateError("");
+    setNewTeamName("");
+    setNewTeamDesc("");
+    setNewTeamPrivate(false);
+    setTeamMemberSearch("");
+    setSelectedTeamMemberIds([]);
+    setIsTeamModalOpen(true);
+  };
+
+  const closeTeamModal = () => {
+    setIsTeamModalOpen(false);
+    setTeamCreateError("");
+    setTeamMemberSearch("");
+  };
+
+  const toggleTeamMember = (userId: string) => {
+    setSelectedTeamMemberIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const handleCreateTeam = async () => {
+    setTeamCreateError("");
+
+    if (!newTeamName.trim()) {
+      setTeamCreateError("Team name is required");
+      return;
+    }
+
+    try {
+      setIsTeamCreating(true);
+      await teamsApi.createTeam({
+        teamName: newTeamName.trim(),
+        description: newTeamDesc.trim(),
+        isPrivate: newTeamPrivate,
+        members: newTeamPrivate ? selectedTeamMemberIds : [],
+      });
+
+      await queryClient.invalidateQueries({ queryKey: ["teams"] });
+      closeTeamModal();
+    } catch (error) {
+      setTeamCreateError(getApiErrorMessage(error, "Failed to create team"));
+    } finally {
+      setIsTeamCreating(false);
     }
   };
 
@@ -564,6 +578,14 @@ export default function Sidebar({ userRole }: SidebarProps) {
 
   const navigateTo = (url: string) => { router.push(url); };
 
+  const renderProjectListIcon = (projectName: string, index: number) => {
+    return (
+      <svg width="14" height="14" viewBox="0 0 48 48" fill="currentColor" className="text-slate-700 dark:text-slate-400" xmlns="http://www.w3.org/2000/svg">
+        <path clipRule="evenodd" strokeWidth="1" fillRule="evenodd" d="M27.5216 0.650893c-0.4405 -0.091897 -0.8783 -0.132327 -1.3002 -0.137486C25.5098 0.504704 24.7693 0.5 24 0.5c-4.7859 0 -8.4563 0.182059 -11.0112 0.376437C9.69689 1.12689 7.14783 3.664 6.90503 6.96494 6.7971 8.43227 6.6914 10.2938 6.61505 12.589c0.11548 -0.0146 0.23181 -0.027 0.34896 -0.0372 2.45278 -0.2129 5.79459 -0.4335 9.73849 -0.5174 3.4182 -0.0726 6.5619 1.6491 8.4078 4.4179l1.0365 1.5549c6.6695 0.0493 11.6216 0.3218 14.8562 0.5746 0.1661 0.0129 0.3306 0.0305 0.4935 0.0524 -0.0054 -1.0304 -0.0167 -2.0054 -0.033 -2.9266 -0.007 -0.4002 -0.0454 -0.8135 -0.1281 -1.2294 -2.3851 -0.0374 -4.7085 -0.1178 -6.659 -0.2023 -3.7805 -0.1636 -6.7887 -3.1718 -6.9523 -6.95232 -0.0846 -1.95423 -0.1652 -4.2828 -0.2025 -6.672687ZM40.104 11.4543c-0.8416 -1.59826 -2.1396 -3.61128 -4.0433 -5.51504 -1.9036 -1.90353 -3.9165 -3.20177 -5.5151 -4.04375 0.0417 1.89511 0.1072 3.71712 0.1757 5.29827 0.0963 2.2256 1.8593 3.98852 4.0849 4.08492 1.581 0.0684 3.4028 0.1339 5.2978 0.1756Zm-23.3492 3.0805c2.5351 -0.0538 4.8866 1.2235 6.2745 3.3052l1.3282 1.9923c0.2761 0.4142 0.749 0.6696 1.2603 0.6725 6.8691 0.0383 11.9323 0.3158 15.1895 0.5703 3.2929 0.2573 5.7294 3.0374 5.6179 6.3147 -0.2037 5.9848 -0.7851 10.8492 -1.2618 13.9924 -0.4579 3.0187 -2.8362 5.3115 -5.9074 5.5803 -3.0232 0.2646 -7.9201 0.5378 -15.2557 0.5378 -7.3358 0 -12.2329 -0.2732 -15.25625 -0.5378 -3.07601 -0.2692 -5.45094 -2.5781 -5.86404 -5.6159C2.3606 37.527 1.69673 30.9217 1.53613 21.369c-0.05463 -3.2491 2.35306 -6.0401 5.64314 -6.3256 2.40702 -0.2089 5.69383 -0.4261 9.57553 -0.5086Z" />
+      </svg>
+    );
+  };
+
   const toggleTheme = () => {
     const newDark = !isDarkMode;
     setIsDarkMode(newDark);
@@ -668,50 +690,96 @@ export default function Sidebar({ userRole }: SidebarProps) {
       {/* Spaces section (projects) */}
       <div className="flex items-center justify-between px-2 py-1">
         <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Spaces</span>
-        {isAdmin && (
-          <button
-            onClick={() => navigateTo("/dashboard/projects")}
-            className="p-1 rounded hover:bg-[var(--bg-surface-2)] text-[var(--text-muted)]"
-            title="New Space"
-          >
-            <PlusIcon className="w-3 h-3" />
-          </button>
-        )}
+        <button
+          onClick={() => navigateTo("/dashboard/teams")}
+          className="w-5 h-5 rounded-md bg-[var(--bg-surface-2)] hover:bg-[var(--bg-surface-3)] text-[var(--text-secondary)] flex items-center justify-center transition-colors"
+          title="New Space"
+        >
+          <PlusIcon className="w-3 h-3" />
+        </button>
       </div>
 
-      {/* All Tasks */}
-      <ContentPanelItem
-        href="/dashboard/tasks"
-        label="All Tasks"
-        rightText={`${projects.length}`}
-        active={pathname === "/dashboard/tasks" && (typeof window !== "undefined" ? !new URLSearchParams(window.location.search).get("project") : true)}
-        onNavigate={navigateTo}
-        icon={<ClipboardDocumentListIcon className="w-3.5 h-3.5" />}
-      />
+      <button
+        onClick={() => navigateTo("/dashboard/tasks")}
+        className="w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-[var(--bg-surface-2)] transition-colors text-left"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--text-muted)]">
+          <path d="M9 6h11" />
+          <path d="M9 12h11" />
+          <path d="M9 18h11" />
+          <path d="M4 6h.01" />
+          <path d="M4 12h.01" />
+          <path d="M4 18h.01" />
+        </svg>
+        <span className="text-[12px] text-[var(--text-secondary)] truncate">All Tasks - {user?.firstName}&apos;s Workspace</span>
+      </button>
 
       {/* Projects tree */}
       {isMounted && (
-        projectsLoading ? (
+        projectsLoading || teamsLoading ? (
           <SkeletonSidebarItems count={4} />
-        ) : projects.length > 0 ? (
-          <div className="mt-1">
-            <button
-              onClick={() => setMyProjectsOpen(!myProjectsOpen)}
-              className="flex items-center gap-1.5 px-2 py-1.5 w-full text-left hover:bg-[var(--bg-surface-2)] rounded-md transition-colors"
-            >
-              <ChevronRightIcon className={`w-3 h-3 text-[var(--text-muted)] transition-transform ${myProjectsOpen ? "rotate-90" : ""}`} />
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--text-muted)">
-                <path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z" />
-              </svg>
-              <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider flex-1">My Projects</span>
-              <span className="text-[10px] text-[var(--text-muted)] bg-[var(--bg-surface-2)] px-1.5 py-0.5 rounded-full">{projects.length}</span>
-            </button>
+        ) : groupedProjectsByTeam.length > 0 ? (
+          <div className="mt-1 space-y-1">
+            {groupedProjectsByTeam.map((group, teamIndex) => {
+              const teamOpen = openTeamIds[group.id] ?? true;
+              const teamActive = group.projects.some((project) => pathname === "/dashboard/tasks" && searchParams.get("project") === project._id);
+              const teamColor = teamIndex % 2 === 0 ? "from-indigo-500 to-blue-600" : "from-fuchsia-500 to-violet-600";
 
-            {myProjectsOpen && (
-              <div className="ml-3.5 py-0.5">
-                <ProjectsList projects={projects} pathname={pathname} onNavigate={navigateTo} />
-              </div>
-            )}
+              return (
+                <div key={group.id}>
+                  <div className={`group flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${teamActive ? "bg-[var(--bg-surface-2)]" : "hover:bg-[var(--bg-surface-2)]"}`}>
+                    <button
+                      onClick={() => toggleTeamOpen(group.id)}
+                      className="flex items-center gap-2 min-w-0 flex-1 text-left"
+                    >
+                      <svg width="20" height="20" viewBox="0 0 52 52" fill="none" className="flex-shrink-0" xmlns="http://www.w3.org/2000/svg">
+                        <path fillRule="evenodd" clipRule="evenodd" d="M46.0082 39.8551C46.2484 36.5877 46.5 31.3996 46.5 24c0 -7.3996 -0.2516 -12.5877 -0.4918 -15.85507 -0.2409 -3.27646 -2.7354 -5.85313 -6.0324 -6.13517C36.9912 1.75444 32.4092 1.5 26 1.5c-6.4091 0 -10.9912 0.25443 -13.9758 0.50975 -3.29701 0.28204 -5.79145 2.85871 -6.03236 6.13517 -0.03087 0.41981 -0.06193 0.87133 -0.09261 1.35517 -0.5222 0.00098 -0.99999 0.00954 -1.42534 0.02206 -1.56772 0.04612 -2.90677 1.08015 -2.96243 2.75495C1.50412 12.498 1.5 12.7385 1.5 13s0.00412 0.5019 0.01146 0.7229c0.05566 1.6747 1.3947 2.7088 2.96243 2.7549 0.34125 0.0101 0.71627 0.0176 1.12088 0.0207 -0.03294 1.2367 -0.05889 2.5703 -0.07524 4.0037 -0.37595 0.0034 -0.72564 0.0105 -1.04564 0.0199 -1.56772 0.0462 -2.90677 1.0802 -2.96243 2.755C1.50412 23.498 1.5 23.7385 1.5 24s0.00412 0.5019 0.01146 0.7229c0.05566 1.6747 1.3947 2.7088 2.96243 2.7549 0.32 0.0095 0.66969 0.0166 1.04563 0.02 0.01636 1.4334 0.04231 2.767 0.07525 4.0037 -0.40462 0.0031 -0.77963 0.0106 -1.12088 0.0206 -1.56772 0.0462 -2.90677 1.0802 -2.96243 2.755C1.50412 34.498 1.5 34.7385 1.5 35s0.00412 0.5019 0.01146 0.7229c0.05566 1.6747 1.3947 2.7088 2.96243 2.7549 0.42534 0.0125 0.90314 0.0211 1.42533 0.0221 0.03068 0.4838 0.06174 0.9353 0.0926 1.3552 0.24092 3.2764 2.73535 5.8531 6.03238 6.1351 2.9846 0.2553 7.5666 0.5098 13.9758 0.5098 6.4091 0 10.9912 -0.2544 13.9758 -0.5098 3.297 -0.282 5.7915 -2.8587 6.0324 -6.1351ZM32.0008 20c0 2.1338 -1.1139 4.0075 -2.792 5.0713 2.8422 1.0417 5.0176 3.4147 5.7294 6.3412 0.3117 1.2813 -0.4381 2.4986 -1.7132 2.8349 -1.4247 0.3759 -3.7315 0.7526 -7.2549 0.7526 -3.5233 0 -5.8302 -0.3767 -7.2549 -0.7526 -1.275 -0.3363 -2.0248 -1.5536 -1.7131 -2.8349 0.715 -2.9399 2.9071 -5.3212 5.7684 -6.3554 -1.6657 -1.0662 -2.7697 -2.9327 -2.7697 -5.0571 0 -3.3137 2.6863 -6 6 -6s6 2.6863 6 6Z" fill="currentColor" />
+                      </svg>
+                      <span className="text-[12px] font-medium text-[var(--text-primary)] truncate">{group.name}</span>
+                    </button>
+
+                    <button className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-opacity">
+                      <EllipsisHorizontalIcon className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => navigateTo("/dashboard/projects")}
+                      className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-opacity"
+                    >
+                      <PlusIcon className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {teamOpen && (
+                    <div className="ml-4 mt-0.5 border-l border-[var(--border-subtle)]/80 pl-2 space-y-0.5">
+                      {group.projects.map((project, index) => {
+                        const isActive = pathname === "/dashboard/tasks" && searchParams.get("project") === project._id;
+                        return (
+                          <button
+                            key={project._id}
+                            onClick={() => navigateTo(`/dashboard/tasks?project=${project._id}`)}
+                            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors ${isActive ? "bg-[var(--bg-surface-2)]" : "hover:bg-[var(--bg-surface-2)]"}`}
+                          >
+                            {renderProjectListIcon(project.projectName, index)}
+                            <span className={`text-[12px] truncate flex-1 ${isActive ? "text-[var(--text-primary)] font-medium" : "text-[var(--text-secondary)]"}`}>
+                              {project.projectName}
+                            </span>
+                            <span className="text-[12px] text-[var(--text-muted)]">{project.assignedUsers?.length || 0}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            <button
+              onClick={() => navigateTo("/dashboard/teams")}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[var(--bg-surface-2)] transition-colors text-left"
+            >
+              <PlusIcon className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+              <span className="text-[12px] text-[var(--text-tertiary)]">New Space</span>
+            </button>
           </div>
         ) : null
       )}
@@ -722,32 +790,85 @@ export default function Sidebar({ userRole }: SidebarProps) {
     <div className="flex-1 overflow-y-auto py-3 ck-scrollbar px-2">
       <div className="flex items-center justify-between px-2 pb-3">
         <span className="text-[13px] font-semibold text-[var(--text-primary)]">Teams</span>
-        <button className="p-1 rounded hover:bg-[var(--bg-surface-2)] text-[var(--text-muted)]"><PlusIcon className="w-3.5 h-3.5" /></button>
+        <button
+          onClick={openTeamModal}
+          className="p-1 rounded hover:bg-[var(--bg-surface-2)] text-[var(--text-muted)]"
+          title="Create team"
+        >
+          <PlusIcon className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       <div className="space-y-0.5">
         {[
-          { label: "All Teams", icon: <UsersIcon className="w-3.5 h-3.5" />, count: 1 },
-          { label: "All People", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4" /><path d="M4 20a8 8 0 1 1 16 0" /></svg>, count: 1 },
-          { label: "Analytics", icon: <ChartBarIcon className="w-3.5 h-3.5" /> },
+          { label: "All People", href: "/dashboard/teams", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4" /><path d="M4 20a8 8 0 1 1 16 0" /></svg>, count: teams.reduce((acc, t) => acc + (t.members?.length || 0), 0) },
+          { label: "Analytics", href: "/dashboard/teams", icon: <ChartBarIcon className="w-3.5 h-3.5" /> },
         ].map((item) => (
-          <ContentPanelItem key={item.label} label={item.label} icon={item.icon} rightText={item.count ? String(item.count) : undefined} onNavigate={navigateTo} />
+          <ContentPanelItem key={item.label} href={item.href} label={item.label} icon={item.icon} rightText={item.count ? String(item.count) : undefined} onNavigate={navigateTo} />
         ))}
       </div>
 
       <div className="my-3 border-t border-[var(--border-subtle)]" />
 
-      <div className="px-2 py-1">
+      <div className="px-2 py-1 flex items-center justify-between">
         <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">My Teams</span>
+        <button
+          onClick={openTeamModal}
+          className="p-1 rounded hover:bg-[var(--bg-surface-2)] text-[var(--text-muted)]"
+          title="Create team"
+        >
+          <PlusIcon className="w-3.5 h-3.5" />
+        </button>
       </div>
 
-      {/* User's workspace team */}
-      {user && (
-        <div className="flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-[var(--bg-surface-2)] cursor-pointer transition-colors mt-1">
-          <div className="w-6 h-6 rounded-md bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
-            {user.firstName?.charAt(0)}
-          </div>
-          <span className="text-[12px] font-medium text-[var(--text-primary)] truncate">{user.firstName}&apos;s Workspace</span>
+      <div className="px-2 mt-1">
+        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-canvas)] focus-within:border-[var(--border-default)] transition-colors">
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="text-[var(--text-muted)] flex-shrink-0"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-3-3" />
+          </svg>
+          <input
+            type="text"
+            value={teamSearch}
+            onChange={(e) => setTeamSearch(e.target.value)}
+            placeholder="Search teams"
+            className="no-focus-ring w-full bg-transparent border-0 outline-none focus:outline-none focus-visible:outline-none text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+          />
+        </div>
+      </div>
+
+      {teamsLoading ? (
+        <div className="px-2 py-2 text-[11px] text-[var(--text-muted)]">Loading teams...</div>
+      ) : filteredTeams.length === 0 ? (
+        <div className="px-2 py-2 text-[11px] text-[var(--text-muted)]">No teams found</div>
+      ) : (
+        <div className="space-y-0.5 mt-1">
+          {teamsToShow.map((team) => (
+            <button
+              key={team._id}
+              onClick={() => navigateTo("/dashboard/teams")}
+              className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-[var(--bg-surface-2)] transition-colors"
+            >
+              <svg width="20" height="20" viewBox="0 0 52 52" fill="none" className="flex-shrink-0" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" clipRule="evenodd" d="M46.0082 39.8551C46.2484 36.5877 46.5 31.3996 46.5 24c0 -7.3996 -0.2516 -12.5877 -0.4918 -15.85507 -0.2409 -3.27646 -2.7354 -5.85313 -6.0324 -6.13517C36.9912 1.75444 32.4092 1.5 26 1.5c-6.4091 0 -10.9912 0.25443 -13.9758 0.50975 -3.29701 0.28204 -5.79145 2.85871 -6.03236 6.13517 -0.03087 0.41981 -0.06193 0.87133 -0.09261 1.35517 -0.5222 0.00098 -0.99999 0.00954 -1.42534 0.02206 -1.56772 0.04612 -2.90677 1.08015 -2.96243 2.75495C1.50412 12.498 1.5 12.7385 1.5 13s0.00412 0.5019 0.01146 0.7229c0.05566 1.6747 1.3947 2.7088 2.96243 2.7549 0.34125 0.0101 0.71627 0.0176 1.12088 0.0207 -0.03294 1.2367 -0.05889 2.5703 -0.07524 4.0037 -0.37595 0.0034 -0.72564 0.0105 -1.04564 0.0199 -1.56772 0.0462 -2.90677 1.0802 -2.96243 2.755C1.50412 23.498 1.5 23.7385 1.5 24s0.00412 0.5019 0.01146 0.7229c0.05566 1.6747 1.3947 2.7088 2.96243 2.7549 0.32 0.0095 0.66969 0.0166 1.04563 0.02 0.01636 1.4334 0.04231 2.767 0.07525 4.0037 -0.40462 0.0031 -0.77963 0.0106 -1.12088 0.0206 -1.56772 0.0462 -2.90677 1.0802 -2.96243 2.755C1.50412 34.498 1.5 34.7385 1.5 35s0.00412 0.5019 0.01146 0.7229c0.05566 1.6747 1.3947 2.7088 2.96243 2.7549 0.42534 0.0125 0.90314 0.0211 1.42533 0.0221 0.03068 0.4838 0.06174 0.9353 0.0926 1.3552 0.24092 3.2764 2.73535 5.8531 6.03238 6.1351 2.9846 0.2553 7.5666 0.5098 13.9758 0.5098 6.4091 0 10.9912 -0.2544 13.9758 -0.5098 3.297 -0.282 5.7915 -2.8587 6.0324 -6.1351ZM32.0008 20c0 2.1338 -1.1139 4.0075 -2.792 5.0713 2.8422 1.0417 5.0176 3.4147 5.7294 6.3412 0.3117 1.2813 -0.4381 2.4986 -1.7132 2.8349 -1.4247 0.3759 -3.7315 0.7526 -7.2549 0.7526 -3.5233 0 -5.8302 -0.3767 -7.2549 -0.7526 -1.275 -0.3363 -2.0248 -1.5536 -1.7131 -2.8349 0.715 -2.9399 2.9071 -5.3212 5.7684 -6.3554 -1.6657 -1.0662 -2.7697 -2.9327 -2.7697 -5.0571 0 -3.3137 2.6863 -6 6 -6s6 2.6863 6 6Z" fill="currentColor"></path></svg>
+              <span className="text-[12px] font-medium text-[var(--text-primary)] truncate text-left flex-1">{team.teamName}</span>
+            </button>
+          ))}
+          {canToggleMoreTeams && (
+            <button
+              onClick={() => setShowAllTeams((prev) => !prev)}
+              className="w-full text-left px-2 py-1.5 text-[11px] font-medium text-[var(--accent)] hover:bg-[var(--bg-surface-2)] rounded-md transition-colors"
+            >
+              {showAllTeams ? "Show less" : "More.."}
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -1085,6 +1206,131 @@ export default function Sidebar({ userRole }: SidebarProps) {
                 className="px-6 py-2.5 rounded-lg text-[13px] font-bold bg-[#1d1c1d] hover:bg-black text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
               >
                 Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Create Team Modal ── */}
+      {isTeamModalOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={closeTeamModal}
+        >
+          <div
+            className="w-full max-w-[520px] rounded-xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden animate-fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative pt-6 px-7 pb-3 border-b border-[var(--border-subtle)]">
+              <button
+                onClick={closeTeamModal}
+                className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-[var(--bg-surface-2)] text-[var(--text-muted)] transition-colors"
+              >
+                <XMarkIcon className="w-4 h-4" />
+              </button>
+              <h2 className="text-[18px] font-semibold text-[var(--text-primary)]">Create Team</h2>
+              <p className="text-[13px] text-[var(--text-tertiary)] mt-1">
+                Create a team and optionally invite members for private collaboration.
+              </p>
+            </div>
+
+            <div className="px-7 py-5 space-y-4">
+              {teamCreateError && (
+                <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-[12px] text-[var(--status-error)]">
+                  {teamCreateError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[13px] font-medium text-[var(--text-secondary)] mb-1.5">Team Name</label>
+                <input
+                  autoFocus
+                  value={newTeamName}
+                  onChange={(e) => setNewTeamName(e.target.value)}
+                  placeholder="e.g. Product Team"
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[13px] font-medium text-[var(--text-secondary)] mb-1.5">Description</label>
+                <input
+                  value={newTeamDesc}
+                  onChange={(e) => setNewTeamDesc(e.target.value)}
+                  placeholder="Optional"
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                />
+              </div>
+
+              <label className="inline-flex items-center gap-2 text-[13px] text-[var(--text-secondary)]">
+                <input
+                  type="checkbox"
+                  checked={newTeamPrivate}
+                  onChange={(e) => setNewTeamPrivate(e.target.checked)}
+                />
+                Private team
+              </label>
+
+              {newTeamPrivate && (
+                <div>
+                  <label className="block text-[13px] font-medium text-[var(--text-secondary)] mb-1.5">Invite Members</label>
+                  <input
+                    value={teamMemberSearch}
+                    onChange={(e) => setTeamMemberSearch(e.target.value)}
+                    placeholder="Search users"
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)] mb-2"
+                  />
+
+                  <div className="max-h-40 overflow-y-auto border border-[var(--border-subtle)] rounded-lg divide-y divide-[var(--border-subtle)]">
+                    {teamUsersLoading ? (
+                      <div className="px-3 py-2 text-[12px] text-[var(--text-tertiary)]">Loading users...</div>
+                    ) : (
+                      teamUsers
+                        .filter((u) =>
+                          `${u.fullName} ${u.email}`
+                            .toLowerCase()
+                            .includes(teamMemberSearch.trim().toLowerCase())
+                        )
+                        .map((u) => (
+                          <label
+                            key={u._id}
+                            className="flex items-center justify-between gap-2 px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-2)]"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate">{u.fullName}</p>
+                              <p className="truncate text-[11px] text-[var(--text-muted)]">{u.email}</p>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={selectedTeamMemberIds.includes(u._id)}
+                              onChange={() => toggleTeamMember(u._id)}
+                            />
+                          </label>
+                        ))
+                    )}
+                  </div>
+
+                  <p className="mt-2 text-[11px] text-[var(--text-tertiary)]">
+                    {selectedTeamMemberIds.length} selected
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="px-7 py-4 border-t border-[var(--border-subtle)] flex items-center justify-end gap-2">
+              <button
+                onClick={closeTeamModal}
+                className="px-4 py-2 rounded-lg text-[13px] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-2)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateTeam}
+                disabled={isTeamCreating}
+                className="px-4 py-2 rounded-lg text-[13px] font-semibold bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-50"
+              >
+                {isTeamCreating ? "Creating..." : "Create Team"}
               </button>
             </div>
           </div>

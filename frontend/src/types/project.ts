@@ -2,12 +2,19 @@ export interface CreateProjectRequest {
   projectName: string;
   projectDescription: string;
   assignedUsers: string[];
+  teamId: string;
+}
+
+export interface TeamInfo {
+  _id: string;
+  teamName: string;
 }
 
 export interface Project {
   _id: string;
   projectName: string;
   projectDescription: string;
+  team?: TeamInfo;
   assignedUsers: UserInfo[];
   createdBy: UserInfo;
   createdAt: string;
