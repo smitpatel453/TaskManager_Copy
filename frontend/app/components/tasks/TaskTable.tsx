@@ -639,17 +639,24 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
     setSubmissionError(null);
     setIsCreating(true);
     try {
+      // Build details array
+      let detailsArray;
+      if (viewMode === "list" && subtasks && subtasks.length > 0) {
+        detailsArray = subtasks.map(st => {
+          const h = st.hours?.toString().padStart(2, '0') || '00';
+          const m = st.minutes?.toString().padStart(2, '0') || '00';
+          return { text: st.text, time: `${h}:${m}` };
+        });
+      } else {
+        // Provide a default detail block if none exist (required by backend)
+        detailsArray = [{ text: newTaskName.trim(), time: "00:00" }];
+      }
+
       const taskData = {
         taskName: newTaskName.trim(),
         description: viewMode === "board" ? newTaskDescription.trim() : undefined,
         hours: viewMode === "list" ? totalEstHours : 0,
-        details: viewMode === "list" && subtasks
-          ? subtasks.map(st => {
-            const h = st.hours?.toString().padStart(2, '0') || '00';
-            const m = st.minutes?.toString().padStart(2, '0') || '00';
-            return { text: st.text, time: `${h}:${m}` };
-          })
-          : [],
+        details: detailsArray,
         status: newTaskStatus,
         priority: newTaskPriority,
         tags: newTaskTagsInput ? newTaskTagsInput.split(',').map(t => t.trim()).filter(Boolean) : [],
@@ -730,24 +737,25 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
   return (
     <div className="w-full">
       {/* List Toolbar */}
-      <div className="flex items-center justify-between mb-4 text-xs">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between mb-3 sm:mb-4 text-xs flex-wrap gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <button
             onClick={() => setGroupByStatus((prev) => !prev)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md font-medium transition-colors ${groupByStatus
+            className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-md font-medium text-[11px] sm:text-xs transition-colors whitespace-nowrap ${groupByStatus
               ? "border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100"
               : "border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface)]"}`}
           >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" />
             </svg>
-            Group: Status
+            <span className="hidden sm:inline">Group: Status</span>
+            <span className="sm:hidden">Group</span>
           </button>
           {isAdmin && groupByStatus && (
             <select
               value={statusProjectFilter}
               onChange={(e) => { setStatusProjectFilter(e.target.value); setCurrentPage(1); }}
-              className="flex items-center gap-1.5 border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[var(--text-secondary)] px-2 py-1 rounded-md text-xs hover:bg-[var(--bg-surface)] shadow-sm outline-none"
+              className="border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[var(--text-secondary)] px-1.5 sm:px-2 py-1 rounded-md text-[10px] sm:text-xs hover:bg-[var(--bg-surface)] shadow-sm outline-none"
             >
               <option value="all">All Projects</option>
               {projects.map((project) => (
@@ -755,44 +763,34 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
               ))}
             </select>
           )}
-          {!readOnly && (
-            <button
-              onClick={() => startInlineAdd("to-do")}
-              className="flex items-center gap-1.5 border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[var(--text-secondary)] px-2.5 py-1 rounded-md hover:bg-[var(--bg-surface)] transition-colors shadow-sm font-medium"
-            >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              Add Task
-            </button>
-          )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
           <button
             onClick={downloadCompletedWorklog}
             disabled={isDownloadingWorklog || isLoading}
-            className="flex items-center gap-1.5 border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[var(--text-secondary)] px-2.5 py-1 rounded-md hover:bg-[var(--bg-surface)] transition-colors shadow-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex items-center gap-1 sm:gap-1.5 border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[var(--text-secondary)] px-2 sm:px-2.5 py-1 rounded-md hover:bg-[var(--bg-surface)] transition-colors shadow-sm font-medium text-[11px] sm:text-[13px] disabled:opacity-60 disabled:cursor-not-allowed"
             title="Download completed tasks worklog"
           >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            {isDownloadingWorklog ? "Preparing..." : "Download Worklog"}
+            <span className="hidden sm:inline">{isDownloadingWorklog ? "Preparing..." : "Download Worklog"}</span>
+            <span className="sm:hidden">{isDownloadingWorklog ? "..." : "Download"}</span>
           </button>
 
           {/* Status filter */}
           <select
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value as typeof statusFilter); setCurrentPage(1); }}
-            className="flex items-center gap-1.5 border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[var(--text-secondary)] px-2 py-1 rounded-md text-xs hover:bg-[var(--bg-surface)] shadow-sm outline-none"
+            className="border border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[var(--text-secondary)] px-1.5 sm:px-2 py-1 rounded-md text-[10px] sm:text-xs hover:bg-[var(--bg-surface)] shadow-sm outline-none"
           >
-            <option value="all">All Tasks</option>
+            <option value="all">All</option>
             <option value="to-do">To Do</option>
             <option value="in-progress">In Progress</option>
-            <option value="completed">Completed</option>
+            <option value="completed">Done</option>
           </select>
         </div>
       </div>
@@ -832,169 +830,11 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                   {!readOnly && (
                     <div className="flex items-center gap-1">
                       <button className="p-1 hover:bg-[var(--bg-surface)] rounded text-[var(--text-muted)]"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" /></svg></button>
-                      <button onClick={() => startInlineAdd(key)} className="p-1 hover:bg-[var(--bg-surface)] rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg></button>
                     </div>
                   )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-2 space-y-2 ck-scrollbar">
-                  {addingInGroup === key && (
-                    <div className="bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded-lg shadow-sm border-[var(--ck-blue)] ring-1 ring-[#e4e4e7] dark:ring-[#3f3f46]">
-                      <div className="flex items-center gap-2 p-2.5 border-b border-[var(--border-subtle)]">
-                        <input
-                          ref={newTaskInputRef}
-                          type="text"
-                          value={newTaskName}
-                          onChange={(e) => setNewTaskName(e.target.value)}
-                          onKeyDown={handleInlineKeyDown}
-                          placeholder="Task Name..."
-                          disabled={isCreating}
-                          className="flex-1 min-w-0 bg-transparent outline-none text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
-                        />
-                        <button onClick={submitInlineTask} disabled={isCreating} className="flex-shrink-0 bg-[#eaeaeb] dark:bg-[#343438] hover:bg-[#d6d6d8] dark:hover:bg-[#404044] text-[var(--text-secondary)] px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors flex items-center gap-1.5">
-                          {isCreating ? "Saving..." : "Save"}
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 10l-5 5 5 5" /><path d="M20 4v7a4 4 0 0 1-4 4H4" /></svg>
-                        </button>
-                      </div>
-
-                      <div className="px-2 pt-1.5 pb-1 border-b border-[var(--border-subtle)]">
-                        <input
-                          type="text"
-                          value={newTaskDescription}
-                          onChange={(e) => setNewTaskDescription(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              submitInlineTask();
-                            }
-                          }}
-                          placeholder="Add subtask description (optional)"
-                          className="w-full bg-transparent border-none outline-none text-[12px] text-[var(--text-secondary)] placeholder-[var(--text-muted)]"
-                        />
-                      </div>
-
-                      <div className="p-1.5 space-y-0.5">
-                        {/* Assignee */}
-                        <div className="relative" ref={assigneeDropdownRef}>
-                          <button onClick={(e) => { e.stopPropagation(); setAssigneeDropdownOpen(!assigneeDropdownOpen); setPriorityDropdownOpenInline(false); }} className="w-full flex items-center gap-3 px-2.5 py-2 hover:bg-[var(--bg-surface)] text-[12px] text-[var(--text-secondary)] rounded-md transition-colors text-left group">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)]"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-                            {newTaskAssignee ? <span className="text-[var(--text-primary)]">{newTaskAssignee === currentUserId ? "Me" : availableUsers.find(u => u._id === newTaskAssignee)?.fullName || "Unknown"}</span> : <span>Add assignee</span>}
-                          </button>
-                          {assigneeDropdownOpen && (
-                            <div className="absolute left-0 top-full mt-1 z-50 w-[240px] bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded-lg shadow-xl max-h-[300px] flex flex-col">
-                              <div className="p-2 border-b border-[var(--border-subtle)]">
-                                <div className="flex items-center gap-2 bg-[var(--bg-surface-2)] px-2 py-1.5 rounded text-[12px]">
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--text-muted)]"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-                                  <input type="text" placeholder="Search or enter email..." className="w-full bg-transparent outline-none text-[var(--text-primary)]" />
-                                </div>
-                              </div>
-                              <div className="p-1.5 overflow-y-auto ck-scrollbar">
-                                <div className="px-2 py-1 text-[10px] text-[var(--text-muted)] mt-1">People</div>
-                                <button onClick={(e) => { e.stopPropagation(); setNewTaskAssignee(currentUserId || ""); setAssigneeDropdownOpen(false); }} className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-[var(--bg-surface)] rounded-md text-[13px] text-[var(--text-primary)]">
-                                  <div className="flex items-center gap-2.5">
-                                    <div className="w-5 h-5 rounded-full bg-gray-600 dark:bg-gray-700 text-white flex justify-center items-center text-[9px] font-bold">Me</div>
-                                    <span>Me <span className="text-[var(--text-muted)] ml-1 text-[11px]">(Profile)</span></span>
-                                  </div>
-                                </button>
-                                <div className="w-full h-px bg-[var(--border-subtle)] my-1"></div>
-                                {availableUsers.map(u => (
-                                  <button key={u._id} onClick={(e) => { e.stopPropagation(); setNewTaskAssignee(u._id); setAssigneeDropdownOpen(false); }} className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-[var(--bg-surface)] rounded-md text-[13px] text-[var(--text-primary)]">
-                                    <div className="flex items-center gap-2.5">
-                                      <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex justify-center items-center text-[9px] font-bold">{u.fullName.charAt(0)}</div>
-                                      <span>{u.fullName}</span>
-                                    </div>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Due Date */}
-                        <div className="relative">
-                          <div className="w-full flex items-center gap-3 px-2.5 py-2 hover:bg-[var(--bg-surface)] text-[12px] text-[var(--text-secondary)] rounded-md transition-colors text-left group cursor-pointer relative">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] flex-shrink-0"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                            {!newTaskDueDate && <span className="absolute left-[38px] pointer-events-none">Add dates</span>}
-                            <input
-                              type="date"
-                              className={`bg-transparent border-none outline-none w-full cursor-pointer h-[20px] ${!newTaskDueDate ? 'text-transparent' : 'text-[var(--text-primary)] bg-[var(--bg-surface-2)] px-1.5 py-0.5 rounded-md'}`}
-                              value={newTaskDueDate}
-                              onChange={e => setNewTaskDueDate(e.target.value)}
-                              style={{ colorScheme: 'dark' }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Priority */}
-                        <div className="relative" ref={priorityDropdownRefInline}>
-                          <button onClick={(e) => { e.stopPropagation(); setPriorityDropdownOpenInline(!priorityDropdownOpenInline); setAssigneeDropdownOpen(false); }} className="w-full flex items-center gap-3 px-2.5 py-2 hover:bg-[var(--bg-surface)] text-[12px] text-[var(--text-secondary)] rounded-md transition-colors text-left group">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)]"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" y1="22" x2="4" y2="15" /></svg>
-                            {newTaskPriority ? <span className="text-[var(--text-primary)] capitalize">{newTaskPriority}</span> : <span>Add priority</span>}
-                          </button>
-                          {priorityDropdownOpenInline && (
-                            <div className="absolute left-0 top-full mt-1 z-50 w-full min-w-[140px] bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded-lg shadow-xl p-1.5">
-                              {["urgent", "high", "normal", "low"].map(p => (
-                                <button key={p} onClick={(e) => { e.stopPropagation(); setNewTaskPriority(p as any); setPriorityDropdownOpenInline(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--bg-surface)] rounded-md text-[12px] text-[var(--text-primary)] capitalize">
-                                  <svg width="11" height="11" viewBox="0 0 24 24" fill={p === 'urgent' ? "#ef4444" : p === 'high' ? "#f59e0b" : p === 'normal' ? "#3b82f6" : "#8b5cf6"} stroke="none"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /></svg>
-                                  {p}
-                                </button>
-                              ))}
-                              <div className="w-full h-px bg-[var(--border-subtle)] my-1"></div>
-                              <button onClick={(e) => { e.stopPropagation(); setNewTaskPriority(undefined); setPriorityDropdownOpenInline(false); }} className="w-full text-left px-3 py-1.5 text-[var(--text-muted)] text-[11px] hover:bg-[var(--bg-surface)] hover:text-[var(--text-secondary)] rounded-md">Clear</button>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Project */}
-                        <div className="relative" ref={projectDropdownRefInline}>
-                          <button onClick={(e) => { e.stopPropagation(); setProjectDropdownOpenInline(!projectDropdownOpenInline); setAssigneeDropdownOpen(false); setPriorityDropdownOpenInline(false); }} className="w-full flex items-center gap-3 px-2.5 py-2 hover:bg-[var(--bg-surface)] text-[12px] text-[var(--text-secondary)] rounded-md transition-colors text-left group">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)]"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>
-                            {newTaskProject ? <span className="text-[var(--text-primary)] truncate block max-w-[120px]">{projects.find(p => String(p._id) === String(newTaskProject))?.projectName || "Unknown Project"}</span> : <span>Add project</span>}
-                          </button>
-                          {projectDropdownOpenInline && (
-                            <div className="absolute left-0 top-full mt-1 z-50 w-[240px] bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded-lg shadow-xl max-h-[300px] overflow-y-auto p-1.5 flex flex-col gap-0.5">
-                              {projects.map(p => (
-                                <button key={String(p._id)} onClick={(e) => { e.stopPropagation(); setNewTaskProject(String(p._id)); setProjectDropdownOpenInline(false); }} className="flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--bg-surface)] rounded-md text-[12px] text-[var(--text-primary)] text-left">
-                                  <div className={`w-2.5 h-2.5 rounded-full bg-blue-500`}></div>
-                                  <span className="truncate">{p.projectName}</span>
-                                </button>
-                              ))}
-                              <div className="w-full h-px bg-[var(--border-subtle)] my-1"></div>
-                              <button onClick={(e) => { e.stopPropagation(); setNewTaskProject(""); setProjectDropdownOpenInline(false); }} className="w-full text-left px-3 py-1.5 text-[var(--text-muted)] text-[11px] hover:bg-[var(--bg-surface)] hover:text-[var(--text-secondary)] rounded-md">Clear</button>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Tags */}
-                        <div className="relative col-span-2">
-                          <div className="w-full flex items-center gap-3 px-2.5 py-2 text-[12px] text-[var(--text-secondary)] rounded-md">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--text-tertiary)] flex-shrink-0"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" /></svg>
-                            <input
-                              type="text"
-                              value={newTaskTagsInput}
-                              onChange={e => setNewTaskTagsInput(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  submitInlineTask();
-                                }
-                              }}
-                              placeholder="Add tags (comma separated) and press Enter to save"
-                              className="w-full bg-transparent border-none outline-none text-[var(--text-primary)] placeholder-[var(--text-muted)]"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {submissionError && <div className="px-3 pb-2 text-[11px] text-red-500 font-medium">{submissionError}</div>}
-
-                      <div className="bg-[var(--bg-surface-2)] border-t border-[var(--border-subtle)] rounded-b-lg p-1 flex items-center justify-between">
-                        <div className="flex gap-1" />
-                        <button onClick={() => setAddingInGroup(null)} className="text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] px-2 py-1 mr-1">Cancel</button>
-                      </div>
-                    </div>
-                  )}
-
                   {groupItems.map(task => (
                     <div
                       key={task._id}
@@ -1079,13 +919,6 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
                       )}
                     </div>
                   ))}
-
-                  {!readOnly && addingInGroup !== key && (
-                    <button onClick={() => startInlineAdd(key)} className="w-full text-left py-2 px-2.5 mt-1 text-[12px] font-medium text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] rounded transition-colors flex items-center gap-1.5">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                      Add Task
-                    </button>
-                  )}
                 </div>
               </div>
             );
@@ -1094,17 +927,17 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
       ) : (
         <div className="border border-[var(--border-subtle)] rounded-lg bg-[var(--bg-canvas)] shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <div className="min-w-[900px]">
+            <div className="min-w-[900px] sm:min-w-full">
               {/* Table Header */}
-              <div className="grid grid-cols-[1fr_120px_140px_140px_120px_130px_40px] gap-2 items-center px-8 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
+              <div className="grid grid-cols-[1fr_100px_120px_120px_100px_110px_35px] gap-1.5 sm:gap-2 items-center px-3 sm:px-8 py-2.5 sm:py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)] text-[10px] sm:text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
                 <div>Name</div>
                 <div>Hours</div>
                 <div>Project</div>
-                <div>Assigned To</div>
+                <div>Assigned</div>
                 <div>Status</div>
-                <div className="flex items-center gap-1">
-                  Due date
-                  <svg className="w-3 h-3 text-purple-400 bg-purple-50 rounded-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
+                <div className="flex items-center gap-0.5 sm:gap-1">
+                  Due
+                  <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-purple-400 bg-purple-50 rounded-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
                 </div>
                 <div className="flex justify-center" />
               </div>
@@ -1988,12 +1821,12 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId, formatDueDate, isDue
         onDragStart={(e) => onTaskDragStart?.(e, task)}
         onDragEnd={() => onTaskDragEnd?.()}
         onClick={() => setExpandedTaskId(isExpanded ? null : task._id)}
-        className={`grid grid-cols-[1fr_120px_140px_140px_120px_130px_40px] gap-2 items-center px-4 py-2.5 border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-surface)] group text-[14px] bg-[var(--bg-canvas)] transition-colors cursor-pointer ${enableDrag ? "cursor-grab active:cursor-grabbing" : ""} ${draggingTaskId === task._id ? "opacity-60" : "opacity-100"} ${updatingTaskId === task._id ? "pointer-events-none" : ""}`}
+        className={`grid grid-cols-[1fr_100px_120px_120px_100px_110px_35px] gap-1.5 sm:gap-2 items-center px-3 sm:px-4 py-2 sm:py-2.5 border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-surface)] group text-[12px] sm:text-[14px] bg-[var(--bg-canvas)] transition-colors cursor-pointer ${enableDrag ? "cursor-grab active:cursor-grabbing" : ""} ${draggingTaskId === task._id ? "opacity-60" : "opacity-100"} ${updatingTaskId === task._id ? "pointer-events-none" : ""}`}
       >
         {/* Name */}
-        <div className="flex items-center gap-3 pl-2">
-          <div className="w-3 h-4 text-[var(--text-muted)] transition-opacity opacity-0 group-hover:opacity-100" aria-hidden="true">
-            <svg viewBox="0 0 12 16" fill="currentColor" className="w-3 h-4">
+        <div className="flex items-center gap-2 pl-1 sm:pl-2">
+          <div className="w-2.5 h-3 sm:w-3 sm:h-4 text-[var(--text-muted)] transition-opacity opacity-0 group-hover:opacity-100 flex-shrink-0" aria-hidden="true">
+            <svg viewBox="0 0 12 16" fill="currentColor" className="w-full h-full">
               <circle cx="3" cy="3" r="1.2" />
               <circle cx="9" cy="3" r="1.2" />
               <circle cx="3" cy="8" r="1.2" />
@@ -2002,31 +1835,31 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId, formatDueDate, isDue
               <circle cx="9" cy="13" r="1.2" />
             </svg>
           </div>
-          <div className="text-[var(--text-muted)] group-hover:text-[var(--text-tertiary)] transition-colors">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b0b0b0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="2 4">
+          <div className="text-[var(--text-muted)] group-hover:text-[var(--text-tertiary)] transition-colors flex-shrink-0">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b0b0b0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="2 4" className="sm:w-4 sm:h-4">
               <circle cx="12" cy="12" r="9" />
             </svg>
           </div>
-          <div className="flex items-center gap-2 truncate">
-            <span className="truncate font-medium text-[var(--text-primary)]">{task.taskName}</span>
-            <svg className="w-3.5 h-3.5 text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <div className="flex items-center gap-1 sm:gap-2 truncate">
+            <span className="truncate font-medium text-[var(--text-primary)] text-[12px] sm:text-[14px]">{task.taskName}</span>
+            <svg className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
             </svg>
           </div>
         </div>
 
         {/* Hours */}
-        <div className="text-[13px] text-[var(--text-secondary)]">
+        <div className="text-[11px] sm:text-[13px] text-[var(--text-secondary)]">
           {task.hours ? `${task.hours.toFixed(2)}h` : "—"}
         </div>
 
         {/* Project */}
-        <div className="text-[13px] text-[var(--text-secondary)] truncate">
+        <div className="text-[11px] sm:text-[13px] text-[var(--text-secondary)] truncate">
           {task.projectName || <span className="text-[var(--text-muted)]">—</span>}
         </div>
 
         {/* Assigned To */}
-        <div className="text-[13px] text-[var(--text-secondary)] truncate pl-1">
+        <div className="text-[11px] sm:text-[13px] text-[var(--text-secondary)] truncate pl-0.5 sm:pl-1">
           {task.assignedToName ? (
             <div
               className="w-6 h-6 rounded-full bg-gray-700 text-white flex items-center justify-center text-[10px] font-bold border border-black"

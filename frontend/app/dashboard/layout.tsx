@@ -39,7 +39,7 @@ export default function DashboardLayout({
   }, []);
 
   return (
-    <div className="flex h-screen w-full bg-[var(--bg-canvas)] text-[13px] font-sans text-[var(--text-primary)] overflow-hidden">
+    <div className="flex flex-col md:flex-row h-screen w-full bg-[var(--bg-canvas)] text-[13px] font-sans text-[var(--text-primary)] overflow-hidden">
       <Sidebar userRole={userRole} />
       <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-canvas)] relative overflow-hidden">
         {/* Main Content */}

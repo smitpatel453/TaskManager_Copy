@@ -11,6 +11,8 @@ import teamsRoutes from "./routes/teams.routes.js";
 import usersRoutes from "./routes/users.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import channelsRoutes from "./routes/channels.routes.js";
+import videocallsRoutes from "./routes/videocalls.routes.js";
+import webhookRoutes from "./routes/webhooks.routes.js";
 import connectDB from "./infrastructure/database/mongodb.js";
 
 const AUTH_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
@@ -32,7 +34,7 @@ export function createApp() {
   app.use(cors(CORS_CONFIG));
   app.use(express.json());
   app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
-  
+
   // Database connection middleware for serverless
   app.use(async (_req, _res, next) => {
     try {
@@ -45,6 +47,9 @@ export function createApp() {
   });
 
   // Routes
+  // Webhooks (no auth required - called by LiveKit)
+  app.use("/api", webhookRoutes);
+
   app.use("/api/auth", authRateLimiter, authRoutes);
   app.use("/api/tasks", tasksRoutes);
   app.use("/api/projects", projectsRoutes);
@@ -52,6 +57,7 @@ export function createApp() {
   app.use("/api/users", usersRoutes);
   app.use("/api/dashboard", dashboardRoutes);
   app.use("/api/channels", channelsRoutes);
+  app.use("/api/videocalls", videocallsRoutes);
   // Error handling middleware
   app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     console.error("Unhandled error:", err);

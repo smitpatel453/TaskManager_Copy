@@ -100,3 +100,6 @@ export class UserModel {
         );
     }
 }
+
+// Export the raw Mongoose model for direct use in controllers
+export const UserMongooseModel = User;

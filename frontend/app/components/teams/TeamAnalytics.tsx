@@ -165,24 +165,24 @@ export default function TeamAnalytics() {
     }
 
     return (
-        <div className="space-y-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="space-y-3 sm:space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <MetricCard label="Teams" value={teams.length} />
                 <MetricCard label="Projects" value={totals.totalProjects} />
                 <MetricCard label="Worklog Hours" value={totals.totalWorklogHours} />
                 <MetricCard label="Work Done" value={totals.totalDoneTasks} />
             </div>
 
-            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] p-4">
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] p-3 sm:p-4">
                 <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">Monthly Worklog and Work Done</h3>
-                    <p className="text-[12px] text-[var(--text-tertiary)]">Last 6 months across all teams</p>
+                    <h3 className="text-[14px] sm:text-[15px] font-semibold text-[var(--text-primary)]">Monthly Worklog and Work Done</h3>
+                    <p className="text-[11px] sm:text-[12px] text-[var(--text-tertiary)]">Last 6 months across all teams</p>
                 </div>
 
                 {monthlySeries.every((item) => item.worklogHours === 0 && item.completedTasks === 0) ? (
                     <p className="text-[13px] text-[var(--text-tertiary)] py-8 text-center">No monthly data to display yet.</p>
                 ) : (
-                    <div className="h-[300px]">
+                    <div className="h-[250px] sm:h-[300px] -mx-4 sm:mx-0 px-2 sm:px-0">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={monthlySeries}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
@@ -204,28 +204,28 @@ export default function TeamAnalytics() {
                 )}
             </div>
 
-            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] p-4">
-                <h3 className="text-[15px] font-semibold text-[var(--text-primary)] mb-3">Team Project Workboard</h3>
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] p-3 sm:p-4">
+                <h3 className="text-[14px] sm:text-[15px] font-semibold text-[var(--text-primary)] mb-3">Team Project Workboard</h3>
                 {teamSummary.length === 0 ? (
                     <p className="text-[13px] text-[var(--text-tertiary)]">No teams available.</p>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
+                    <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
+                        <table className="w-full text-left border-collapse min-w-[300px] sm:min-w-full">
                             <thead>
-                                <tr className="text-[11px] uppercase tracking-wide text-[var(--text-muted)] border-b border-[var(--border-subtle)]">
-                                    <th className="py-2 pr-3">Team</th>
-                                    <th className="py-2 pr-3">Projects</th>
-                                    <th className="py-2 pr-3">Worklog Hours</th>
-                                    <th className="py-2">Work Done</th>
+                                <tr className="text-[10px] sm:text-[11px] uppercase tracking-wide text-[var(--text-muted)] border-b border-[var(--border-subtle)]">
+                                    <th className="py-2 pr-2 sm:pr-3">Team</th>
+                                    <th className="py-2 pr-2 sm:pr-3 text-right">Projects</th>
+                                    <th className="py-2 pr-2 sm:pr-3 text-right">Hours</th>
+                                    <th className="py-2 text-right">Done</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {teamSummary.map((row) => (
-                                    <tr key={row.id} className="text-[13px] text-[var(--text-primary)] border-b border-[var(--border-subtle)]/60 last:border-0">
-                                        <td className="py-2.5 pr-3 font-medium">{row.teamName}</td>
-                                        <td className="py-2.5 pr-3">{row.projectCount}</td>
-                                        <td className="py-2.5 pr-3">{row.worklogHours}</td>
-                                        <td className="py-2.5">{row.completedTasks}</td>
+                                    <tr key={row.id} className="text-[12px] sm:text-[13px] text-[var(--text-primary)] border-b border-[var(--border-subtle)]/60 last:border-0">
+                                        <td className="py-2 pr-2 sm:pr-3 font-medium truncate">{row.teamName}</td>
+                                        <td className="py-2 pr-2 sm:pr-3 text-right">{row.projectCount}</td>
+                                        <td className="py-2 pr-2 sm:pr-3 text-right">{row.worklogHours}</td>
+                                        <td className="py-2 text-right">{row.completedTasks}</td>
                                     </tr>
                                 ))}
                             </tbody>

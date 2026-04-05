@@ -25,4 +25,9 @@ export const ENV = {
   SMTP_PASS: process.env.SMTP_PASS,
   SMTP_FROM: process.env.SMTP_FROM,
   SMTP_SECURE: (process.env.SMTP_SECURE || "false").toLowerCase() === "true",
+  LIVEKIT_URL: process.env.LIVEKIT_URL || "http://localhost:7880",
+  LIVEKIT_API_KEY: process.env.LIVEKIT_API_KEY || "devkey",
+  LIVEKIT_API_SECRET: process.env.LIVEKIT_API_SECRET || "secret",
+  MAX_CALL_DURATION_MINUTES: parseInt(process.env.MAX_CALL_DURATION_MINUTES || "120", 10),
+  CALL_WARNING_THRESHOLD_MINUTES: parseInt(process.env.CALL_WARNING_THRESHOLD_MINUTES || "110", 10),
 };

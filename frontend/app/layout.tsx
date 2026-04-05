@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Crimson_Pro } from "next/font/google";
 import "./global.css";
 import ReactQueryProvider from "./providers/ReactQueryProvider";
+import { SocketProvider } from "./providers/SocketProvider";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -32,7 +33,9 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${inter.variable} ${crimsonPro.variable} font-ui antialiased`}
       >
-        <ReactQueryProvider>{children}</ReactQueryProvider>
+        <ReactQueryProvider>
+          <SocketProvider>{children}</SocketProvider>
+        </ReactQueryProvider>
       </body>
     </html>
   );

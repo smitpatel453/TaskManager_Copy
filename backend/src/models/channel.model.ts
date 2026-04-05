@@ -7,6 +7,11 @@ export interface ChannelDocument extends Document {
     members: mongoose.Types.ObjectId[];
     joinedMembers: mongoose.Types.ObjectId[];
     createdBy: mongoose.Types.ObjectId;
+    activeCall?: {
+        roomName: string;
+        startedAt: Date;
+        participants: mongoose.Types.ObjectId[];
+    } | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -19,6 +24,11 @@ const channelSchema = new Schema<ChannelDocument>(
         members: [{ type: Schema.Types.ObjectId, ref: "users" }],
         joinedMembers: [{ type: Schema.Types.ObjectId, ref: "users" }],
         createdBy: { type: Schema.Types.ObjectId, ref: "users", required: true },
+        activeCall: {
+            roomName: String,
+            startedAt: Date,
+            participants: [{ type: Schema.Types.ObjectId, ref: "users" }],
+        },
     },
     {
         timestamps: true,

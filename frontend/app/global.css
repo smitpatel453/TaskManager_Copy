@@ -10,7 +10,7 @@
   --bg-surface-3: #E9EBF0;
 
   /* Border colors */
-  --border-subtle: #E9EBF0;
+  --border-subtle: #acb5c0;
   --border-default: #D1D5DB;
   --border-hover: #9CA3AF;
 
@@ -21,8 +21,8 @@
   --text-muted: #BCC0C7;
 
   /* Accent color - ClickUp purple-blue */
-  --accent: #7B68EE;
-  --accent-hover: #6C5CE7;
+  --accent: #515152;
+  --accent-hover: #343435;
   --accent-light: rgba(123, 104, 238, 0.1);
 
   /* ClickUp blue */
@@ -61,8 +61,8 @@
   --text-tertiary: #9CA3AF;
   --text-muted: #6B7280;
 
-  --accent: #9B8AFB;
-  --accent-hover: #B0A1FC;
+  --accent: #f0ecec;
+  --accent-hover: #ababab;
   --accent-light: rgba(155, 138, 251, 0.15);
 
   --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
@@ -123,11 +123,6 @@ body {
 }
 
 /* Focus styles */
-*:focus-visible {
-  outline: 2px solid var(--ck-blue);
-  outline-offset: 1px;
-}
-
 .no-focus-ring:focus,
 .no-focus-ring:focus-visible {
   outline: none !important;

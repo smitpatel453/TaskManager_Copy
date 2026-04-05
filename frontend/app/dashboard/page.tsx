@@ -105,7 +105,7 @@ export default function DashboardPage() {
       {isDataLoading ? (
         <SkeletonDashboardCards />
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5 mb-6">
           {/* Recent Card */}
           <OverviewCard title="Recent">
             {projects.length === 0 ? (
@@ -168,9 +168,9 @@ export default function DashboardPage() {
                   </div>
                 )}
                 {tasksByStatus.length > 0 ? (
-                  <div className="flex items-center justify-center py-3">
-                    <div className="relative">
-                      <svg width="140" height="140" viewBox="0 0 140 140">
+                  <div className="flex flex-col sm:flex-row items-center justify-center py-3 gap-4">
+                    <div className="relative flex-shrink-0">
+                      <svg width="120" height="120" viewBox="0 0 140 140" className="sm:w-[140px] sm:h-[140px]">
                         {(() => {
                           let cumulativePercent = 0;
                           return tasksByStatus.map((item, idx) => {
@@ -212,9 +212,9 @@ export default function DashboardPage() {
                         </text>
                       </svg>
                     </div>
-                    <div className="ml-4 space-y-2">
+                    <div className="space-y-2 w-full sm:w-auto">
                       {tasksByStatus.map((item) => (
-                        <div key={item._id} className="flex items-center gap-2">
+                        <div key={item._id} className="flex items-center gap-2 justify-center sm:justify-start">
                           <div
                             className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                             style={{ backgroundColor: statusColorMap[item._id] || "#9CA3AF" }}

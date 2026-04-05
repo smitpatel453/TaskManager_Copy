@@ -36,6 +36,7 @@ type StoredChannel = {
   isPrivate?: boolean;
   createdBy?: string;
   joinedMemberIds?: string[];
+  joined?: boolean;
 };
 
 type SidebarProject = {
@@ -134,7 +135,7 @@ const TaskFilters = memo(function TaskFilters({
   const searchParams = useSearchParams();
   if (!myTasksOpen) return null;
   return (
-    <div className="ml-3.5 py-0.5">
+    <div className="py-0.5 space-y-0.5">
       {[
         {
           key: "assigned",
@@ -165,18 +166,15 @@ const TaskFilters = memo(function TaskFilters({
             </svg>
           ),
         },
-      ].map((item, idx, arr) => (
-        <div key={item.key} className="flex items-stretch">
-          <TreeConnector isLast={idx === arr.length - 1} />
-          <div className="flex-1 min-w-0">
-            <ContentPanelItem
-              href={item.href}
-              label={item.label}
-              active={item.isActive}
-              icon={item.icon}
-              onNavigate={onNavigate}
-            />
-          </div>
+      ].map((item) => (
+        <div key={item.key} className="px-2">
+          <ContentPanelItem
+            href={item.href}
+            label={item.label}
+            active={item.isActive}
+            icon={item.icon}
+            onNavigate={onNavigate}
+          />
         </div>
       ))}
     </div>
@@ -250,6 +248,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Active icon rail panel
@@ -258,6 +257,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
   // Collapsible sections inside content panel
   const [myTasksOpen, setMyTasksOpen] = useState(false);
   const [openTeamIds, setOpenTeamIds] = useState<Record<string, boolean>>({});
+  const [expandedProjectTeams, setExpandedProjectTeams] = useState<Record<string, boolean>>({});
 
   // Channels state
   const [channels, setChannels] = useState<StoredChannel[]>([]);
@@ -362,6 +362,12 @@ export default function Sidebar({ userRole }: SidebarProps) {
   const toggleTeamOpen = (teamId: string) => {
     setOpenTeamIds((prev) => ({ ...prev, [teamId]: !(prev[teamId] ?? true) }));
   };
+
+  const toggleProjectTeamExpanded = (teamId: string) => {
+    setExpandedProjectTeams((prev) => ({ ...prev, [teamId]: !(prev[teamId] ?? false) }));
+  };
+
+  const PROJECT_SIDEBAR_LIMIT = 4;
 
   useEffect(() => { setIsMounted(true); }, []);
 
@@ -691,13 +697,6 @@ export default function Sidebar({ userRole }: SidebarProps) {
       {/* Spaces section (projects) */}
       <div className="flex items-center justify-between px-2 py-1">
         <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Spaces</span>
-        <button
-          onClick={() => navigateTo("/dashboard/teams")}
-          className="w-5 h-5 rounded-md bg-[var(--bg-surface-2)] hover:bg-[var(--bg-surface-3)] text-[var(--text-secondary)] flex items-center justify-center transition-colors"
-          title="New Space"
-        >
-          <PlusIcon className="w-3 h-3" />
-        </button>
       </div>
 
       <button
@@ -752,7 +751,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
 
                   {teamOpen && (
                     <div className="ml-4 mt-0.5 border-l border-[var(--border-subtle)]/80 pl-2 space-y-0.5">
-                      {group.projects.map((project, index) => {
+                      {group.projects.slice(0, expandedProjectTeams[group.id] ? undefined : PROJECT_SIDEBAR_LIMIT).map((project, index) => {
                         const isActive = pathname === "/dashboard/tasks" && searchParams.get("project") === project._id;
                         return (
                           <button
@@ -768,6 +767,14 @@ export default function Sidebar({ userRole }: SidebarProps) {
                           </button>
                         );
                       })}
+                      {group.projects.length > PROJECT_SIDEBAR_LIMIT && (
+                        <button
+                          onClick={() => toggleProjectTeamExpanded(group.id)}
+                          className="w-full text-left px-2 py-1.5 text-[11px] font-medium text-[var(--accent)] hover:bg-[var(--bg-surface-2)] rounded-md transition-colors"
+                        >
+                          {expandedProjectTeams[group.id] ? "Show less" : `More.. (${group.projects.length - PROJECT_SIDEBAR_LIMIT})`}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -791,13 +798,15 @@ export default function Sidebar({ userRole }: SidebarProps) {
     <div className="flex-1 overflow-y-auto py-3 ck-scrollbar px-2">
       <div className="flex items-center justify-between px-2 pb-3">
         <span className="text-[13px] font-semibold text-[var(--text-primary)]">Teams</span>
-        <button
-          onClick={openTeamModal}
-          className="p-1 rounded hover:bg-[var(--bg-surface-2)] text-[var(--text-muted)]"
-          title="Create team"
-        >
-          <PlusIcon className="w-3.5 h-3.5" />
-        </button>
+        {isAdmin && (
+          <button
+            onClick={openTeamModal}
+            className="p-1 rounded hover:bg-[var(--bg-surface-2)] text-[var(--text-muted)]"
+            title="Create team"
+          >
+            <PlusIcon className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       <div className="space-y-0.5">
@@ -813,13 +822,15 @@ export default function Sidebar({ userRole }: SidebarProps) {
 
       <div className="px-2 py-1 flex items-center justify-between">
         <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">My Teams</span>
-        <button
-          onClick={openTeamModal}
-          className="p-1 rounded hover:bg-[var(--bg-surface-2)] text-[var(--text-muted)]"
-          title="Create team"
-        >
-          <PlusIcon className="w-3.5 h-3.5" />
-        </button>
+        {isAdmin && (
+          <button
+            onClick={openTeamModal}
+            className="p-1 rounded hover:bg-[var(--bg-surface-2)] text-[var(--text-muted)]"
+            title="Create team"
+          >
+            <PlusIcon className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       <div className="px-2 mt-1">
@@ -881,18 +892,9 @@ export default function Sidebar({ userRole }: SidebarProps) {
         <span className="text-[13px] font-semibold text-[var(--text-primary)]">My Tasks</span>
       </div>
       <div className="space-y-0.5">
-        <button
-          onClick={() => setMyTasksOpen(!myTasksOpen)}
-          className="flex items-center gap-1.5 px-2 py-1.5 w-full text-left text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-2)] rounded-md transition-colors text-[11px] font-medium"
-        >
-          <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${!myTasksOpen ? "-rotate-90" : ""}`} />
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-          My Tasks
-        </button>
-
-        {isMounted && myTasksOpen && (
+        {isMounted && (
           <Suspense fallback={null}>
-            <TaskFilters pathname={pathname} myTasksOpen={myTasksOpen} user={user} onNavigate={navigateTo} />
+            <TaskFilters pathname={pathname} myTasksOpen={true} user={user} onNavigate={navigateTo} />
           </Suspense>
         )}
       </div>
@@ -907,6 +909,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
     if (pathname.startsWith("/dashboard/users")) setActivePanel("users");
     else if (pathname.startsWith("/dashboard/projects")) setActivePanel("projects");
     else if (pathname.startsWith("/dashboard/tasks")) setActivePanel("tasks");
+    else if (pathname.startsWith("/dashboard/teams")) setActivePanel("teams");
     else setActivePanel("home");
   }, [pathname]);
 
@@ -920,6 +923,144 @@ export default function Sidebar({ userRole }: SidebarProps) {
 
   return (
     <>
+      {/* ── Mobile Header ── */}
+      <div className="md:hidden h-[52px] bg-[var(--bg-canvas)] border-b border-[var(--border-subtle)] flex items-center justify-between px-3 flex-shrink-0">
+        <button
+          onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+          className="p-1.5 rounded-lg hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] transition-colors"
+          title="Toggle menu"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+
+        <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate">
+          {user ? `${user.firstName}'s WS` : "Workspace"}
+        </span>
+
+        <div className="w-7 h-7 flex-shrink-0" />
+      </div>
+
+      {/* ── Mobile Sidebar Overlay ── */}
+      {isMobileSidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/40 z-30 top-[52px]"
+          onClick={() => setIsMobileSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* ── Mobile Sidebar ── */}
+      <div
+        className={`md:hidden fixed left-0 top-[52px] h-[calc(100vh-52px)] w-56 bg-[var(--bg-surface)] border-r border-[var(--border-subtle)] shadow-lg transform transition-transform duration-300 z-40 flex flex-col overflow-hidden ${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+      >
+        {/* Mobile Sidebar Content */}
+        <div className="flex-1 overflow-y-auto ck-scrollbar flex flex-col">
+          {/* Navigation Items */}
+          <div className="p-2 space-y-0.5">
+            {visibleNavItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActivePanel(item.id);
+                  if (item.href) navigateTo(item.href);
+                  setIsMobileSidebarOpen(false);
+                }}
+                className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-colors text-[12px] ${(activePanel === item.id || (item.href && pathname === item.href))
+                  ? "bg-[var(--accent-light)] text-[var(--accent)] font-medium"
+                  : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-2)]"
+                  }`}
+              >
+                <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center">{item.icon}</span>
+                <span className="truncate">{item.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Divider */}
+          <div className="my-1.5 border-t border-[var(--border-subtle)]" />
+
+          {/* Quick Actions */}
+          <div className="px-2 py-1.5 space-y-1">
+            <div className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-2">Recent</div>
+
+            {/* Channels Preview */}
+            {isMounted && channels.slice(0, 3).map((chan) => {
+              const channelId = ((chan as { id?: string; channelId?: string }).id || (chan as { id?: string; channelId?: string }).channelId || "").toLowerCase();
+              const isActive = pathname === `/dashboard/channels/${channelId}`;
+              return (
+                <button
+                  key={channelId || chan.name}
+                  onClick={() => {
+                    navigateTo(`/dashboard/channels/${channelId}`);
+                    setIsMobileSidebarOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2 px-2.5 py-1 rounded-md text-left transition-colors text-[11px] ${isActive
+                    ? "bg-[var(--accent-light)] text-[var(--accent)] font-medium"
+                    : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface-2)]"
+                    }`}
+                >
+                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isActive ? "bg-[var(--accent)]" : "bg-[var(--border-subtle)]"}`} />
+                  <span className="truncate"># {chan.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Mobile Sidebar Footer */}
+        <div className="border-t border-[var(--border-subtle)] p-2 space-y-1.5 flex-shrink-0">
+          <button
+            onClick={() => {
+              toggleTheme();
+              setIsMobileSidebarOpen(false);
+            }}
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-surface-2)] transition-colors text-[11px]"
+          >
+            {isDarkMode ? <SunIcon className="w-3.5 h-3.5" /> : <MoonIcon className="w-3.5 h-3.5" />}
+            <span className="font-medium truncate">{isDarkMode ? "Light" : "Dark"}</span>
+          </button>
+
+          {user && (
+            <div className="px-2 py-1.5 rounded-md bg-[var(--bg-surface-2)]">
+              <div className="flex items-center gap-1.5">
+                <div className="w-6 h-6 rounded-full bg-gray-600 text-white flex items-center justify-center text-[9px] font-bold flex-shrink-0">
+                  {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-medium text-[var(--text-primary)] truncate">{user.firstName}</p>
+                  <p className="text-[9px] text-[var(--text-muted)] truncate">{user.email}</p>
+                </div>
+              </div>
+              <div className="mt-1.5 flex gap-1 text-[10px]">
+                <button
+                  onClick={() => {
+                    openPasswordModal();
+                    setIsMobileSidebarOpen(false);
+                  }}
+                  className="flex-1 px-1.5 py-1 rounded border border-[var(--border-subtle)] hover:bg-[var(--bg-surface)] transition-colors truncate"
+                >
+                  Settings
+                </button>
+                <button
+                  onClick={() => {
+                    handleLogout();
+                    setIsMobileSidebarOpen(false);
+                  }}
+                  className="flex-1 px-1.5 py-1 rounded border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-colors truncate"
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* ── Dual-column sidebar ── */}
       <div className="hidden md:flex h-screen flex-shrink-0">
 
@@ -1214,7 +1355,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
       )}
 
       {/* ── Create Team Modal ── */}
-      {isTeamModalOpen && (
+      {isTeamModalOpen && isAdmin && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm"
           onClick={closeTeamModal}

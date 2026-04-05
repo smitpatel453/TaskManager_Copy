@@ -20,6 +20,8 @@ import {
   type ChannelMessage,
   type ChannelUser,
 } from "../../../../src/api/channels.api";
+import { ChannelVideoCall } from "../../../components/videocalls/ChannelVideoCall";
+import { ChannelCallPrompt } from "../../../components/videocalls/ChannelCallPrompt";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 type Member = ChannelUser;
@@ -165,18 +167,29 @@ function groupMessages(messages: Message[], currentUserId: string): MessageGroup
   const groups: MessageGroup[] = [];
   for (const msg of messages) {
     const isMe = msg.sender?._id === currentUserId;
-    const last = groups[groups.length - 1];
-    if (last && last.sender?._id === msg.sender?._id) {
-      last.messages.push(msg);
-    } else {
-      groups.push({ sender: msg.sender, messages: [msg], isMe });
-    }
+    // Each message is individual, not combined with others
+    groups.push({ sender: msg.sender, messages: [msg], isMe });
   }
   return groups;
 }
 
 function formatTime(d: string | Date) {
   return new Date(d).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function formatRelativeTime(d: string | Date) {
+  const now = new Date();
+  const then = new Date(d);
+  const diffMs = now.getTime() - then.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "now";
+  if (diffMins < 60) return `${diffMins} min ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return then.toLocaleDateString();
 }
 function formatDateDivider(d: string | Date) {
   const date = new Date(d);
@@ -197,7 +210,7 @@ function renderMessageText(text: string) {
   return parts.map((part, index) => {
     if (part.startsWith("@")) {
       return (
-        <span key={`${part}-${index}`} className="text-[var(--ck-blue)] font-medium bg-[var(--ck-blue)]/10 px-1 rounded mr-0.5">
+        <span key={`${part}-${index}`} className="text-amber-700 font-semibold bg-amber-100 px-1.5 py-0.5 rounded mr-0.5 inline-block">
           {part}
         </span>
       );
@@ -246,6 +259,11 @@ export default function ChannelPage() {
   // Add Member feature state
   const [allUsers, setAllUsers] = useState<Member[]>([]);
   const [addMemberQuery, setAddMemberQuery] = useState("");
+
+  // Video call state
+  const [showVideoCall, setShowVideoCall] = useState(false);
+  const [callStarted, setCallStarted] = useState(false);
+  const [callData, setCallData] = useState<{ token: string; url: string; roomName: string } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -654,10 +672,18 @@ export default function ChannelPage() {
             )}
           </div>
           <div className="flex items-center gap-1.5">
-            <button className="p-2 rounded-lg hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors" title="Call">
+            <button
+              onClick={() => setShowVideoCall(!showVideoCall)}
+              className="p-2 rounded-lg hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              title="Call"
+            >
               <PhoneIcon className="w-4 h-4" />
             </button>
-            <button className="p-2 rounded-lg hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors" title="Video">
+            <button
+              onClick={() => setShowVideoCall(!showVideoCall)}
+              className="p-2 rounded-lg hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              title="Video"
+            >
               <VideoCameraIcon className="w-4 h-4" />
             </button>
             <div className="w-px h-5 bg-[var(--border-subtle)] mx-1" />
@@ -670,6 +696,52 @@ export default function ChannelPage() {
             </button>
           </div>
         </header>
+
+        {/* Video call section */}
+        {showVideoCall ? (
+          <div className="relative flex-1 flex flex-col border-t border-[var(--border-subtle)] bg-[var(--bg-surface-1)] overflow-hidden p-4">
+            <button
+              onClick={() => {
+                setShowVideoCall(false);
+                setCallStarted(false);
+                setCallData(null);
+              }}
+              className="absolute top-4 right-4 z-10 p-2 rounded-lg bg-[var(--bg-surface-2)] hover:bg-[var(--bg-surface-3)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              title="Close video call"
+            >
+              ✕
+            </button>
+
+            {callStarted && callData ? (
+              <div className="flex-1 overflow-auto">
+                <ChannelVideoCall
+                  channelId={normalizedChannelId}
+                  channelName={channelName}
+                  onCallEnd={() => {
+                    setShowVideoCall(false);
+                    setCallStarted(false);
+                    setCallData(null);
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <ChannelCallPrompt
+                  channelId={normalizedChannelId}
+                  channelName={channelName}
+                  onStartCall={(token, url, roomName) => {
+                    setCallData({ token, url, roomName });
+                    setCallStarted(true);
+                  }}
+                  onJoinCall={(token, url, roomName) => {
+                    setCallData({ token, url, roomName });
+                    setCallStarted(true);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        ) : null}
 
         {/* Messages area */}
         <div className="flex-1 overflow-y-auto px-0 py-0 space-y-0 ck-scrollbar" id="messages-container">
@@ -737,58 +809,70 @@ export default function ChannelPage() {
                     {showDiv && <DateDivider label={formatDateDivider(firstMsg.createdAt)} />}
 
                     {/* Message group */}
-                    <div className={`flex px-5 py-1 ${group.isMe ? "justify-end" : "justify-start"}`}>
-                      <div className={`flex gap-3 max-w-[78%] rounded-xl px-3 py-2 transition-colors hover:bg-[var(--bg-surface-2)] ${group.isMe ? "flex-row-reverse" : "flex-row"}`}>
-                      <div className="flex-shrink-0 pt-0.5">
-                        {group.isMe ? (
-                          <div className={`w-8 h-8 rounded-full ${avatarColor("Admin User")} flex items-center justify-center text-[11px] font-semibold text-white shadow-sm`}>
-                            {(currentUser?.firstName?.[0] ?? "A") + (currentUser?.lastName?.[0] ?? "U")}
-                          </div>
-                        ) : (
-                          <Avatar name={senderName} />
-                        )}
-                      </div>
-
-                      {/* Content */}
-                      <div className={`flex-1 min-w-0 ${group.isMe ? "text-right" : "text-left"}`}>
-                        <div className={`flex items-baseline gap-2 mb-0.5 ${group.isMe ? "justify-end" : "justify-start"}`}>
-                          <span className={`text-[14px] font-bold ${group.isMe ? "text-[var(--ck-blue)]" : "text-[var(--text-primary)]"}`}>
-                            {group.isMe ? "You" : senderName}
-                          </span>
-                          <span className="text-[11px] text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] transition-colors">
-                            {formatTime(firstMsg.createdAt)}
-                          </span>
-                        </div>
-                        <div className="space-y-0.5">
-                          {group.messages.map((msg, mi) => (
-                            <div key={mi} className={`${msg.local ? "opacity-60" : "text-[var(--text-primary)]"}`}>
-                              {msg.text && (
-                                <p className="text-[14px] leading-relaxed break-words">
-                                  {renderMessageText(msg.text)}
-                                </p>
-                              )}
-
-                              {!!msg.attachments?.length && (
-                                <div className={`mt-1 flex flex-wrap gap-2 ${group.isMe ? "justify-end" : "justify-start"}`}>
-                                  {msg.attachments.map((file, fileIndex) => (
-                                    <a
-                                      key={`${file.url}-${fileIndex}`}
-                                      href={file.url}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="inline-flex items-center gap-2 rounded-md border border-[var(--border-default)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-2)]"
-                                    >
-                                      <PaperClipIcon className="w-3.5 h-3.5 text-[var(--text-tertiary)]" />
-                                      <span className="max-w-[220px] truncate">{file.fileName}</span>
-                                    </a>
-                                  ))}
-                                </div>
-                              )}
+                    <div className={`flex px-5 py-2 ${group.isMe ? "justify-end" : "justify-start"}`}>
+                      <div className={`flex gap-2 max-w-[72%] ${group.isMe ? "flex-row-reverse" : "flex-row"}`}>
+                        {/* Avatar */}
+                        <div className="flex-shrink-0 mt-1">
+                          {group.isMe ? (
+                            <div className={`w-8 h-8 rounded-full ${avatarColor("Admin User")} flex items-center justify-center text-[11px] font-semibold text-white shadow-sm`}>
+                              {(currentUser?.firstName?.[0] ?? "A") + (currentUser?.lastName?.[0] ?? "U")}
                             </div>
-                          ))}
+                          ) : (
+                            <Avatar name={senderName} />
+                          )}
+                        </div>
+
+                        {/* Message bubble */}
+                        <div className={`flex flex-col ${group.isMe ? "items-end" : "items-start"}`}>
+                          {!group.isMe && (
+                            <span className="text-[12px] font-semibold text-[var(--text-primary)] px-3 mb-0.5">
+                              {senderName}
+                            </span>
+                          )}
+
+                          <div className={`rounded-2xl px-4 py-2 ${group.isMe
+                            ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-br-sm shadow-sm"
+                            : "bg-[var(--bg-surface-2)] text-[var(--text-primary)] rounded-bl-sm border border-[var(--border-subtle)]"
+                            }`}>
+                            <div className="space-y-1">
+                              {group.messages.map((msg, mi) => (
+                                <div key={mi} className={`${msg.local ? "opacity-60" : ""}`}>
+                                  {msg.text && (
+                                    <p className="text-[14px] leading-relaxed break-words">
+                                      {renderMessageText(msg.text)}
+                                    </p>
+                                  )}
+
+                                  {!!msg.attachments?.length && (
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                      {msg.attachments.map((file, fileIndex) => (
+                                        <a
+                                          key={`${file.url}-${fileIndex}`}
+                                          href={file.url}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className={`inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[12px] transition-all ${group.isMe
+                                            ? "bg-blue-400/30 hover:bg-blue-400/50 text-white"
+                                            : "bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border-default)] hover:bg-[var(--bg-surface-2)]"
+                                            }`}
+                                        >
+                                          <PaperClipIcon className="w-3.5 h-3.5" />
+                                          <span className="max-w-[180px] truncate">{file.fileName}</span>
+                                        </a>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Time stamp */}
+                          <span className={`text-[11px] mt-1 ${group.isMe ? "text-[var(--text-tertiary)]" : "text-[var(--text-secondary)]"}`}>
+                            {formatRelativeTime(firstMsg.createdAt)}
+                          </span>
                         </div>
                       </div>
-                    </div>
                     </div>
                   </div>
                 );
@@ -939,169 +1023,255 @@ export default function ChannelPage() {
       </div>
 
       {/* ── FOLLOWERS PANEL ── */}
+      {/* Mobile overlay backdrop */}
       {membersOpen && (
-        <aside className="w-[300px] flex-shrink-0 border-l border-[var(--border-subtle)] bg-[var(--bg-canvas)] flex flex-col shadow-[-4px_0_24px_rgba(0,0,0,0.02)] z-20">
-          <div className="flex items-center justify-between px-4 py-3 pb-2 border-b border-[var(--border-subtle)]">
+        <div
+          className="fixed inset-0 bg-black/30 md:hidden z-40"
+          onClick={() => setMembersOpen(false)}
+        />
+      )}
+
+      {/* Members panel - hidden on mobile, visible on desktop */}
+      <aside className="hidden md:flex w-[300px] flex-shrink-0 border-l border-[var(--border-subtle)] bg-[var(--bg-canvas)] flex-col shadow-[-4px_0_24px_rgba(0,0,0,0.02)] z-20">
+        <div className="flex items-center justify-between px-4 py-3 pb-2 border-b border-[var(--border-subtle)]">
+          <span className="text-[14px] font-semibold text-[var(--text-primary)]">Followers</span>
+          <button onClick={() => setMembersOpen(false)} className="w-6 h-6 flex items-center justify-center rounded-md bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-4 px-4 pt-2 border-b border-[var(--border-subtle)]">
+          <button
+            onClick={() => setActivePeopleTab("followers")}
+            className={`pb-2 text-[13px] transition-colors border-b-2 ${activePeopleTab === "followers"
+              ? "font-semibold text-[var(--text-primary)] border-[var(--text-primary)]"
+              : "font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-transparent"
+              }`}
+          >
+            Followers <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[var(--bg-surface-3)] text-[10px] ml-1">{canMessageInChannel ? members.length : 0}</span>
+          </button>
+          <button
+            onClick={() => setActivePeopleTab("access")}
+            className={`pb-2 text-[13px] transition-colors border-b-2 ${activePeopleTab === "access"
+              ? "font-semibold text-[var(--text-primary)] border-[var(--text-primary)]"
+              : "font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-transparent"
+              }`}
+          >
+            Access <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[var(--bg-surface-2)] text-[10px] ml-1">{accessMembers.length}</span>
+          </button>
+        </div>
+
+        {activePeopleTab === "followers" ? (
+          <>
+            <div className="flex-1 overflow-y-auto ck-scrollbar py-2 px-1 space-y-0.5">
+              {!canMessageInChannel ? (
+                <div className="px-3 py-3 text-[12px] text-[var(--text-tertiary)]">
+                  Join this channel to view all existing members.
+                </div>
+              ) : (
+                <>
+                  {canManageMembers && (
+                    <div className="pb-2 border-b border-[var(--border-subtle)]">
+                      <div className="px-3">
+                        <div className="relative flex items-center">
+                          <svg className="absolute left-3 w-4 h-4 text-[var(--text-tertiary)]" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
+                          <input
+                            ref={memberSearchRef}
+                            type="text"
+                            placeholder="Search people or invite by email"
+                            value={addMemberQuery}
+                            onChange={(e) => setAddMemberQuery(e.target.value)}
+                            className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-[var(--border-default)] text-[13px] bg-transparent focus:border-[var(--ck-blue)] focus:ring-1 focus:ring-[var(--ck-blue-hover)] outline-none transition-all placeholder-[var(--text-tertiary)]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {canManageMembers && addMemberQuery.trim() && (
+                    <>
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-tertiary)] px-3 pt-1 pb-1">
+                        SEARCH RESULTS
+                      </p>
+                      {filteredAddableUsers.map((user) => (
+                        <button
+                          key={`add-${user._id}`}
+                          onClick={() => handleAddMember(user)}
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors text-left group"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <Avatar name={`${user.firstName} ${user.lastName}`} size="sm" />
+                            <div className="min-w-0">
+                              <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">
+                                {user.firstName} {user.lastName}
+                              </p>
+                              {user.email && (
+                                <p className="text-[11px] text-[var(--text-tertiary)] truncate">{user.email}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="px-2 py-1 rounded-md bg-[var(--bg-surface-3)] text-[11px] font-medium text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 group-hover:bg-[var(--ck-blue)] group-hover:text-white transition-all">
+                            Add
+                          </div>
+                        </button>
+                      ))}
+                      {filteredAddableUsers.length === 0 && (
+                        <div className="px-3 py-2 text-[12px] text-[var(--text-tertiary)]">
+                          No users found.
+                        </div>
+                      )}
+                      <div className="mx-2 my-1 h-px bg-[var(--border-subtle)]" />
+                    </>
+                  )}
+
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-tertiary)] px-3 pt-1 pb-1">
+                    FOLLOWERS
+                  </p>
+
+                  {!channelConfig?.isPrivate && (
+                    <p className="px-3 pb-1 text-[12px] font-semibold text-[var(--text-secondary)]">
+                      Everyone !!
+                    </p>
+                  )}
+
+                  {canManageMembers && (
+                    <button
+                      onClick={() => memberSearchRef.current?.focus()}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors text-left group"
+                    >
+                      <div className="w-7 h-7 rounded-full bg-[var(--bg-surface-3)] text-[var(--text-secondary)] border border-dashed border-[var(--border-hover)] flex items-center justify-center group-hover:border-[var(--text-secondary)] transition-colors">
+                        <PlusIcon className="w-4 h-4" />
+                      </div>
+                      <span className="text-[13px] font-medium text-[var(--text-primary)]">Add People</span>
+                    </button>
+                  )}
+
+                  {members.map((m) => (
+                    <div
+                      key={m._id}
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors cursor-pointer group"
+                    >
+                      <div className="relative">
+                        <Avatar name={`${m.firstName} ${m.lastName}`} size="sm" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">
+                          {m.firstName} {m.lastName}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 overflow-y-auto ck-scrollbar py-2 px-1 space-y-0.5">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-tertiary)] px-3 pt-1 pb-1">
+              CAN ADD MEMBERS
+            </p>
+            {accessMembers.map((user) => (
+              <div
+                key={`access-${user._id}`}
+                className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <Avatar name={`${user.firstName} ${user.lastName}`} size="sm" />
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">
+                      {user.firstName} {user.lastName}
+                    </p>
+                    {user.email && (
+                      <p className="text-[11px] text-[var(--text-tertiary)] truncate">{user.email}</p>
+                    )}
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[var(--bg-surface-3)] text-[var(--text-secondary)]">
+                  {isAdmin ? "Admin" : "Member"}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </aside>
+
+      {/* Mobile members panel overlay */}
+      {membersOpen && (
+        <div className="fixed inset-0 md:hidden flex flex-col z-40 bg-[var(--bg-canvas)]">
+          {/* Mobile header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-canvas)]">
             <span className="text-[14px] font-semibold text-[var(--text-primary)]">Followers</span>
-            <button onClick={() => setMembersOpen(false)} className="w-6 h-6 flex items-center justify-center rounded-md bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+            <button onClick={() => setMembersOpen(false)} className="p-1.5 rounded-md hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
             </button>
           </div>
 
+          {/* Tabs */}
           <div className="flex items-center gap-4 px-4 pt-2 border-b border-[var(--border-subtle)]">
             <button
               onClick={() => setActivePeopleTab("followers")}
-              className={`pb-2 text-[13px] transition-colors border-b-2 ${activePeopleTab === "followers"
+              className={`pb-2 text-[13px] transition-colors border-b-2 whitespace-nowrap ${activePeopleTab === "followers"
                 ? "font-semibold text-[var(--text-primary)] border-[var(--text-primary)]"
                 : "font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-transparent"
                 }`}
             >
-              Followers <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[var(--bg-surface-3)] text-[10px] ml-1">{canMessageInChannel ? members.length : 0}</span>
+              Followers
             </button>
             <button
               onClick={() => setActivePeopleTab("access")}
-              className={`pb-2 text-[13px] transition-colors border-b-2 ${activePeopleTab === "access"
+              className={`pb-2 text-[13px] transition-colors border-b-2 whitespace-nowrap ${activePeopleTab === "access"
                 ? "font-semibold text-[var(--text-primary)] border-[var(--text-primary)]"
                 : "font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-transparent"
                 }`}
             >
-              Access <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[var(--bg-surface-2)] text-[10px] ml-1">{accessMembers.length}</span>
+              Access
             </button>
           </div>
 
-          {activePeopleTab === "followers" ? (
-            <>
-              <div className="flex-1 overflow-y-auto ck-scrollbar py-2 px-1 space-y-0.5">
-                {!canMessageInChannel ? (
-                  <div className="px-3 py-3 text-[12px] text-[var(--text-tertiary)]">
-                    Join this channel to view all existing members.
-                  </div>
-                ) : (
-                  <>
-                    {canManageMembers && (
-                      <div className="pb-2 border-b border-[var(--border-subtle)]">
-                        <div className="px-3">
-                          <div className="relative flex items-center">
-                            <svg className="absolute left-3 w-4 h-4 text-[var(--text-tertiary)]" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
-                            <input
-                              ref={memberSearchRef}
-                              type="text"
-                              placeholder="Search people or invite by email"
-                              value={addMemberQuery}
-                              onChange={(e) => setAddMemberQuery(e.target.value)}
-                              className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-[var(--border-default)] text-[13px] bg-transparent focus:border-[var(--ck-blue)] focus:ring-1 focus:ring-[var(--ck-blue-hover)] outline-none transition-all placeholder-[var(--text-tertiary)]"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {canManageMembers && addMemberQuery.trim() && (
-                      <>
-                        <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-tertiary)] px-3 pt-1 pb-1">
-                          SEARCH RESULTS
-                        </p>
-                        {filteredAddableUsers.map((user) => (
-                          <button
-                            key={`add-${user._id}`}
-                            onClick={() => handleAddMember(user)}
-                            className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors text-left group"
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <Avatar name={`${user.firstName} ${user.lastName}`} size="sm" />
-                              <div className="min-w-0">
-                                <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">
-                                  {user.firstName} {user.lastName}
-                                </p>
-                                {user.email && (
-                                  <p className="text-[11px] text-[var(--text-tertiary)] truncate">{user.email}</p>
-                                )}
-                              </div>
-                            </div>
-                            <div className="px-2 py-1 rounded-md bg-[var(--bg-surface-3)] text-[11px] font-medium text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 group-hover:bg-[var(--ck-blue)] group-hover:text-white transition-all">
-                              Add
-                            </div>
-                          </button>
-                        ))}
-                        {filteredAddableUsers.length === 0 && (
-                          <div className="px-3 py-2 text-[12px] text-[var(--text-tertiary)]">
-                            No users found.
-                          </div>
-                        )}
-                        <div className="mx-2 my-1 h-px bg-[var(--border-subtle)]" />
-                      </>
-                    )}
-
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-tertiary)] px-3 pt-1 pb-1">
-                      FOLLOWERS
-                    </p>
-
-                    {!channelConfig?.isPrivate && (
-                      <p className="px-3 pb-1 text-[12px] font-semibold text-[var(--text-secondary)]">
-                        Everyone !!
-                      </p>
-                    )}
-
-                    {canManageMembers && (
-                      <button
-                        onClick={() => memberSearchRef.current?.focus()}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors text-left group"
-                      >
-                        <div className="w-7 h-7 rounded-full bg-[var(--bg-surface-3)] text-[var(--text-secondary)] border border-dashed border-[var(--border-hover)] flex items-center justify-center group-hover:border-[var(--text-secondary)] transition-colors">
-                          <PlusIcon className="w-4 h-4" />
-                        </div>
-                        <span className="text-[13px] font-medium text-[var(--text-primary)]">Add People</span>
-                      </button>
-                    )}
-
-                    {members.map((m) => (
-                      <div
-                        key={m._id}
-                        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors cursor-pointer group"
-                      >
-                        <div className="relative">
-                          <Avatar name={`${m.firstName} ${m.lastName}`} size="sm" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">
-                            {m.firstName} {m.lastName}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 overflow-y-auto ck-scrollbar py-2 px-1 space-y-0.5">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-tertiary)] px-3 pt-1 pb-1">
-                CAN ADD MEMBERS
-              </p>
-              {accessMembers.map((user) => (
-                <div
-                  key={`access-${user._id}`}
-                  className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Avatar name={`${user.firstName} ${user.lastName}`} size="sm" />
-                    <div className="min-w-0">
+          {/* Mobile members list */}
+          <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
+            {activePeopleTab === "followers" ? (
+              <>
+                {members.map((m) => (
+                  <div
+                    key={m._id}
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors"
+                  >
+                    <div className="relative">
+                      <Avatar name={`${m.firstName} ${m.lastName}`} size="sm" />
+                    </div>
+                    <div className="min-w-0 flex-1">
                       <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">
-                        {user.firstName} {user.lastName}
+                        {m.firstName} {m.lastName}
                       </p>
-                      {user.email && (
-                        <p className="text-[11px] text-[var(--text-tertiary)] truncate">{user.email}</p>
-                      )}
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[var(--bg-surface-3)] text-[var(--text-secondary)]">
-                    {isAdmin ? "Admin" : "Member"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </aside>
+                ))}
+              </>
+            ) : (
+              <>
+                {accessMembers.map((user) => (
+                  <div
+                    key={`access-${user._id}`}
+                    className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-[var(--bg-surface-2)] transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar name={`${user.firstName} ${user.lastName}`} size="sm" />
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">
+                          {user.firstName} {user.lastName}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-md text-[9px] font-semibold bg-[var(--bg-surface-3)] text-[var(--text-secondary)] flex-shrink-0">
+                      {isAdmin ? "Admin" : "Member"}
+                    </span>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Toasts */}

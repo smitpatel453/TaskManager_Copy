@@ -112,7 +112,7 @@ export function SkeletonTasksList({ rows = 8 }: { rows?: number }) {
           {/* Status badge */}
           <Skeleton className="h-5 rounded" style={{ width: 72 }} />
           {/* Task name */}
-          <Skeleton className="skeleton-text flex-1" style={{ width: `${50 + Math.random() * 30}%` }} />
+          <Skeleton className="skeleton-text flex-1" style={{ width: "65%" }} />
           {/* Assignee */}
           <Skeleton className="skeleton-circle w-6 h-6 flex-shrink-0" />
           {/* Due date */}
