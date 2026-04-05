@@ -21,12 +21,25 @@ export interface LiveKitTokenResponse {
  * Generates a LiveKit access token for a user to join a room
  * This token is required before connecting to the LiveKit server
  */
-export function generateLiveKitToken({
+export async function generateLiveKitToken({
     userId,
     userName,
     roomName,
-}: GenerateTokenParams): LiveKitTokenResponse {
+}: GenerateTokenParams): Promise<LiveKitTokenResponse> {
     try {
+        // Validate inputs
+        if (!userId || !userName || !roomName) {
+            throw new Error(`Missing required token parameters: userId=${!!userId}, userName=${!!userName}, roomName=${!!roomName}`);
+        }
+
+        if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
+            throw new Error('LiveKit configuration missing: API_KEY or API_SECRET not set');
+        }
+
+        if (!LIVEKIT_URL) {
+            throw new Error('LiveKit configuration missing: LIVEKIT_URL not set');
+        }
+
         const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
 
         // Set user identity (REQUIRED by LiveKit)
@@ -42,18 +55,27 @@ export function generateLiveKitToken({
             canSubscribe: true,
         });
 
-        // Generate JWT token
-        const token = at.toJwt();
+        // Generate JWT token (this is async)
+        const token = await at.toJwt();
 
-        console.log(`✅ LiveKit token generated for user ${userId} in room ${roomName}`);
+        // Validate token was generated properly
+        if (!token || typeof token !== 'string' || token.length < 50) {
+            throw new Error(`Invalid token generated: ${typeof token}, length=${token?.length || 0}`);
+        }
+
+        console.log(`✅ LiveKit token generated successfully for user ${userId} in room ${roomName}`);
+        console.log(`   Token length: ${token.length}`);
+        console.log(`   Token preview: ${token.substring(0, 50)}...`);
 
         return {
             token,
             url: LIVEKIT_URL,
         };
     } catch (error) {
-        console.error('Error generating LiveKit token:', error);
-        throw new Error('Failed to generate LiveKit token');
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.error('❌ Error generating LiveKit token:', errorMsg);
+        console.error('   Full error:', error);
+        throw new Error(`Failed to generate LiveKit token: ${errorMsg}`);
     }
 }
 
@@ -88,8 +110,8 @@ export function handleLiveKitWebhook(body: any): void {
 }
 
 export const liveKitService = {
-    generateLiveKitToken,
-    generateRoomName,
-    handleLiveKitWebhook,
-    LIVEKIT_URL,
+    generateLiveKitToken: generateLiveKitToken,
+    generateRoomName: generateRoomName,
+    handleLiveKitWebhook: handleLiveKitWebhook,
+    LIVEKIT_URL: LIVEKIT_URL,
 };

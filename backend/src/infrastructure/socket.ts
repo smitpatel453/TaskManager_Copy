@@ -77,7 +77,16 @@ export const initializeSocket = (httpServer: HttpServer) => {
         const userId = socket.data.userId as string | undefined;
         if (!userId) return;
 
-        const channels = await ChannelModel.find({ joinedMembers: userId })
+        // Join socket rooms for ALL channels the user is a member of.
+        // This includes both `members` (access list for private channels) AND
+        // `joinedMembers` (chat-joined list). Using `members` ensures that
+        // users on other pages still receive call notifications (channel:call-started).
+        const channels = await ChannelModel.find({
+          $or: [
+            { members: userId },
+            { joinedMembers: userId },
+          ]
+        })
           .select('channelId')
           .lean();
 
@@ -86,6 +95,7 @@ export const initializeSocket = (httpServer: HttpServer) => {
             socket.join(channel.channelId);
           }
         }
+        console.log(`👥 Bootstrapped ${channels.length} channel room(s) for user ${userId}`);
       } catch (error) {
         console.error('Error bootstrapping socket rooms:', error);
       }
@@ -110,7 +120,12 @@ export const initializeSocket = (httpServer: HttpServer) => {
     });
 
     socket.on('leave_channel', (channelId: string) => {
-      socket.leave(channelId);
+      if (channelId && typeof channelId === 'string') {
+        socket.leave(channelId);
+        console.log(`✓ Socket left channel: ${channelId}`);
+      } else {
+        console.warn(`⚠️ Invalid leave_channel request - invalid channelId:`, channelId);
+      }
     });
 
     socket.on('send_message', async (data: {
@@ -157,6 +172,32 @@ export const initializeSocket = (httpServer: HttpServer) => {
         io.to(data.channelId).emit('receive_message', populatedMessage);
       } catch (error) {
         console.error('Error handling send_message event:', error);
+      }
+    });
+
+    socket.on('typing_start', async (data: { channelId: string }) => {
+      try {
+        const userId = socket.data.userId as string | undefined;
+        if (!userId || !data.channelId) return;
+        socket.to(data.channelId).emit('user_typing_start', {
+          channelId: data.channelId,
+          userId,
+        });
+      } catch (error) {
+        console.error('Error handling typing_start event:', error);
+      }
+    });
+
+    socket.on('typing_stop', async (data: { channelId: string }) => {
+      try {
+        const userId = socket.data.userId as string | undefined;
+        if (!userId || !data.channelId) return;
+        socket.to(data.channelId).emit('user_typing_stop', {
+          channelId: data.channelId,
+          userId,
+        });
+      } catch (error) {
+        console.error('Error handling typing_stop event:', error);
       }
     });
 

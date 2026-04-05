@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { LiveKitRoom, VideoConference, formatChatMessage } from '@livekit/components-react';
+import { LiveKitRoom, VideoConference } from '@livekit/components-react';
 import '@livekit/components-styles';
 import { videocallsApi } from '../../../src/api/videocalls.api';
 import { useSocket } from '../../providers/SocketProvider';
@@ -10,16 +10,23 @@ import axios from 'axios';
 interface VideoCallProps {
     channelId: string;
     channelName: string;
+    callType?: 'voice' | 'video';
     onCallEnd?: () => void;
     theme?: 'dark' | 'light';
+    token?: string;
+    url?: string;
+    roomName?: string;
+    callId?: string;
 }
 
-export function ChannelVideoCall({ channelId, channelName, onCallEnd, theme = 'dark' }: VideoCallProps) {
-    const [token, setToken] = useState<string>('');
-    const [url, setUrl] = useState<string>('');
-    const [roomName, setRoomName] = useState<string>('');
-    const [callId, setCallId] = useState<string>('');
-    const [loading, setLoading] = useState(true);
+export function ChannelVideoCall({ channelId, channelName, callType = 'video', onCallEnd, theme = 'dark', token: propsToken, url: propsUrl, roomName: propsRoomName, callId: propsCallId }: VideoCallProps) {
+    const [token, setToken] = useState<string>(propsToken || '');
+    const [url, setUrl] = useState<string>(propsUrl || '');
+    const [roomName, setRoomName] = useState<string>(propsRoomName || '');
+    const [callId, setCallId] = useState<string>(propsCallId || '');
+    // Start as false — we already have the token/url from props, no blocking load needed.
+    // LiveKit's own <VideoConference> UI handles its internal connection state.
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string>('');
     const [callStarted, setCallStarted] = useState(false);
     const [recordingEnabled, setRecordingEnabled] = useState(false);
@@ -29,48 +36,125 @@ export function ChannelVideoCall({ channelId, channelName, onCallEnd, theme = 'd
     const [showWarning, setShowWarning] = useState(false);
     const [minutesRemaining, setMinutesRemaining] = useState(0);
     const durationInterval = useRef<NodeJS.Timeout | null>(null);
+    const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    // Prevents the onDisconnected callback from double-calling handleLeaveRoom
+    // when the user explicitly clicks Leave (which sets token to '' then unmounts)
+    const isLeavingRef = useRef(false);
     const { socket } = useSocket();
 
-    // Try to start or join a call
+    // Update state when props change
     useEffect(() => {
-        // Only initialize if token is already provided
+        if (propsToken) setToken(propsToken);
+        if (propsUrl) setUrl(propsUrl);
+        if (propsRoomName) setRoomName(propsRoomName);
+        if (propsCallId) setCallId(propsCallId);
+    }, [propsToken, propsUrl, propsRoomName, propsCallId]);
+
+    // Validate token/url/roomName and start the call UI
+    useEffect(() => {
         if (!token || !url || !roomName) {
             console.log('⏳ Waiting for token:', { hasToken: !!token, hasUrl: !!url, hasRoomName: !!roomName });
             return;
         }
 
-        console.log('✅ Token received, initializing LiveKit');
+        // Guard: navigator.mediaDevices is only available in secure contexts (HTTPS or localhost).
+        // When the app is accessed via plain HTTP from another device, the browser blocks it entirely,
+        // resulting in the "undefined is not an object (evaluating 'navigator.mediaDevices.getUserMedia')" error.
+        const isSecure =
+            window.location.protocol === 'https:' ||
+            window.location.hostname === 'localhost' ||
+            window.location.hostname === '127.0.0.1';
+
+        if (!isSecure || !navigator.mediaDevices) {
+            console.error('❌ Insecure context: navigator.mediaDevices is not available.');
+            setError(
+                'Video/audio calls require a secure connection (HTTPS). ' +
+                'You are currently accessing this app over plain HTTP from a remote device. ' +
+                'Please ask your administrator to enable HTTPS, or access the app via localhost on this machine.'
+            );
+            return;
+        }
+
+        // Validate token format
+        if (typeof token !== 'string' || token.length < 50) {
+            console.error('❌ Invalid token received:', { type: typeof token, length: token?.length });
+            setError('Invalid authentication token received. Please try again.');
+            return;
+        }
+
+        console.log('✅ Token received and validated, rendering LiveKit room');
         console.log('📍 LiveKit URL:', url);
         console.log('🎥 Room name:', roomName);
 
-        // Token received, stop loading
-        setLoading(false);
-        setCallStarted(true);
-
-        // Add timeout failsafe - if connection doesn't establish in 15 seconds, show error
-        const timeoutId = setTimeout(() => {
-            if (loading) {
-                console.warn('⏱️ Connection timeout - taking longer than expected');
-                setError('Video connection timeout. Please check your internet and try again.');
-                setLoading(false);
-            }
-        }, 15000);
-
-        // Start tracking call duration
-        if (callStarted) {
-            durationInterval.current = setInterval(() => {
-                setCallDuration((prev) => prev + 1);
-            }, 1000);
+        // Validate room name format
+        if (!/^[a-zA-Z0-9_-]+$/.test(roomName)) {
+            console.error('❌ Invalid room name format:', roomName);
+            setError('Invalid room name format. Please try again.');
+            return;
         }
 
+        // Validate URL format
+        try {
+            new URL(url);
+        } catch (e) {
+            console.error('❌ Invalid LiveKit URL:', url);
+            setError('Invalid video server URL. Please try again.');
+            return;
+        }
+
+        // Everything looks good — show the LiveKit room immediately.
+        // LiveKit's own VideoConference component handles its internal loading state.
+        setError('');
+        setCallStarted(true);
+
+        // Start tracking call duration
+        durationInterval.current = setInterval(() => {
+            setCallDuration((prev) => prev + 1);
+        }, 1000);
+
+        // Safety timeout: if LiveKit fires onError after 30s still no connection, show error
+        connectionTimeoutRef.current = setTimeout(() => {
+            // Only set error if we haven't already set one
+            setError((prev) => {
+                if (!prev) {
+                    console.warn('⏱️ LiveKit connection timeout after 30 seconds');
+                    return 'Video connection taking too long. Please check your internet connection and try again.';
+                }
+                return prev;
+            });
+        }, 30000);
+
         return () => {
-            // Cleanup
-            clearTimeout(timeoutId);
-            if (durationInterval.current) {
-                clearInterval(durationInterval.current);
-            }
+            if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+            if (durationInterval.current) clearInterval(durationInterval.current);
         };
     }, [token, url, roomName]);
+
+    // Handle graceful shutdown on page unload
+    useEffect(() => {
+        if (!callStarted || !callId) return;
+
+        const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
+            console.log('🔴 Page unloading, attempting graceful shutdown...');
+            e.preventDefault();
+            e.returnValue = '';
+
+            try {
+                // Attempt to end call before unload
+                await videocallsApi.endCall(channelId, callId).catch(() => {
+                    // Silently fail if unable to reach API
+                    console.log('Could not reach API for cleanup');
+                });
+            } catch (err) {
+                console.error('Cleanup error:', err);
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, [callStarted, callId, channelId]);
 
     // Listen for call warning events from server
     useEffect(() => {
@@ -130,31 +214,54 @@ export function ChannelVideoCall({ channelId, channelName, onCallEnd, theme = 'd
         setError(`Connection failed: ${error.message || 'Unable to connect to video server'}`);
     };
 
+    const checkNetworkConnectivity = async () => {
+        try {
+            console.log('🌐 Checking network connectivity...');
+            const response = await fetch(url, { method: 'HEAD', mode: 'no-cors' });
+            console.log('✅ Network OK, server reachable');
+            return true;
+        } catch (err) {
+            console.error('❌ Network error:', err);
+            return false;
+        }
+    };
+
+    // Diagnostic effect to check connectivity on component mount
+    useEffect(() => {
+        if (token && url && roomName) {
+            checkNetworkConnectivity();
+        }
+    }, [token, url, roomName]);
+
     const handleLeaveRoom = useCallback(async () => {
+        if (isLeavingRef.current) return; // prevent double-execution
+        isLeavingRef.current = true;
+
         try {
             if (callId) {
                 await videocallsApi.endCall(channelId, callId);
             } else {
                 await videocallsApi.leaveCall(channelId);
             }
-            setToken('');
-            setRoomName('');
-            setCallStarted(false);
-            if (durationInterval.current) {
-                clearInterval(durationInterval.current);
-            }
-            onCallEnd?.();
         } catch (err) {
             console.error('Error leaving call:', err);
+        } finally {
+            if (durationInterval.current) clearInterval(durationInterval.current);
+            if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+            // Let the parent (page.tsx) handle unmounting by calling onCallEnd.
+            // Do NOT clear token/roomName here — clearing them causes LiveKit to
+            // report 'Client initiated disconnect' while it's mid-teardown.
+            onCallEnd?.();
         }
     }, [channelId, callId, onCallEnd]);
 
     if (loading) {
+        // loading is now always false on mount — this block is a safety fallback only
         return (
-            <div className="w-full h-96 flex items-center justify-center bg-[var(--bg-surface-1)] rounded-lg">
+            <div className="w-full h-full flex items-center justify-center bg-[var(--bg-canvas)]">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--accent)] mx-auto mb-4"></div>
-                    <p className="text-[var(--text-secondary)]">Initializing video call...</p>
+                    <p className="text-[var(--text-secondary)]">Preparing {callType === 'voice' ? 'voice' : 'video'} call...</p>
                 </div>
             </div>
         );
@@ -162,7 +269,7 @@ export function ChannelVideoCall({ channelId, channelName, onCallEnd, theme = 'd
 
     if (error) {
         return (
-            <div className="w-full h-96 flex items-center justify-center bg-[var(--bg-surface-1)] rounded-lg">
+            <div className="w-full h-full flex items-center justify-center bg-[var(--bg-canvas)]">
                 <div className="text-center">
                     <p className="text-red-500 mb-4">{error}</p>
                     <button
@@ -178,14 +285,14 @@ export function ChannelVideoCall({ channelId, channelName, onCallEnd, theme = 'd
 
     if (!token || !url || !roomName) {
         return (
-            <div className="w-full h-96 flex items-center justify-center bg-[var(--bg-surface-1)] rounded-lg">
+            <div className="w-full h-full flex items-center justify-center bg-[var(--bg-canvas)]">
                 <p className="text-[var(--text-secondary)]">Preparing video environment...</p>
             </div>
         );
     }
 
     return (
-        <div className={`w-full h-96 ${theme === 'dark' ? 'bg-black' : 'bg-white'} rounded-lg overflow-hidden relative`}>
+        <div className={`w-full h-full ${theme === 'dark' ? 'bg-[#0f0f11]' : 'bg-[#f5f5f5]'} overflow-hidden relative flex flex-col`}>
             {/* Call Duration Warning */}
             {showWarning && (
                 <div className="absolute top-16 left-4 right-4 bg-yellow-500/90 text-white p-3 rounded-lg animate-pulse z-50 flex items-center justify-between">
@@ -206,76 +313,51 @@ export function ChannelVideoCall({ channelId, channelName, onCallEnd, theme = 'd
 
             {/* Video Conference */}
             <LiveKitRoom
-                video={true}
+                video={callType === 'video'}
                 audio={true}
                 token={token}
                 connect={true}
                 serverUrl={url}
                 data-lk-theme={theme}
                 style={{ height: '100%' }}
-                onDisconnected={handleLeaveRoom}
+                onConnected={() => {
+                    console.log('✅ LiveKit connected successfully');
+                    if (connectionTimeoutRef.current) {
+                        clearTimeout(connectionTimeoutRef.current);
+                        connectionTimeoutRef.current = null;
+                    }
+                }}
+                onDisconnected={() => {
+                    console.log('⚠️ LiveKit disconnected');
+                    // Only auto-leave if the user didn't click Leave themselves.
+                    // If isLeavingRef is true, handleLeaveRoom already ran.
+                    if (!isLeavingRef.current) {
+                        handleLeaveRoom();
+                    }
+                }}
+                onError={(error) => {
+                    const msg = error?.message || '';
+                    // 'Client initiated disconnect' is a normal LiveKit lifecycle event
+                    // that fires when the room is intentionally disconnected. It is NOT
+                    // an error the user needs to see.
+                    if (
+                        msg.toLowerCase().includes('client initiated disconnect') ||
+                        msg.toLowerCase().includes('client_initiated')
+                    ) {
+                        console.log('ℹ️ LiveKit disconnected (client initiated — normal)');
+                        return;
+                    }
+                    console.error('❌ LiveKit error:', error);
+                    if (connectionTimeoutRef.current) {
+                        clearTimeout(connectionTimeoutRef.current);
+                        connectionTimeoutRef.current = null;
+                    }
+                    setError(`Connection failed: ${msg || 'Unable to connect to video server. Please check that the LiveKit server URL is correctly configured.'}`);
+                }}
             >
                 <VideoConference />
             </LiveKitRoom>
 
-            {/* Call Info Bar */}
-            <div className="absolute top-4 left-4 right-4 flex items-center justify-between bg-black/60 rounded-lg p-3 text-white text-sm">
-                <div className="flex items-center gap-3">
-                    <span className="font-medium">{channelName}</span>
-                    <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                        {formatDuration(callDuration)}
-                    </span>
-                    {isRecording && (
-                        <span className="flex items-center gap-1 text-red-500">
-                            <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-                            Recording
-                        </span>
-                    )}
-                </div>
-
-                {/* Controls */}
-                <div className="flex items-center gap-2">
-                    {!isRecording && (
-                        <button
-                            onClick={handleEnableRecording}
-                            className="p-2 rounded-lg hover:bg-white/20 transition-colors flex items-center gap-1"
-                            title="Enable recording"
-                        >
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                <circle cx="12" cy="12" r="10" fill="red" opacity="0.5" />
-                                <circle cx="12" cy="12" r="4" fill="red" />
-                            </svg>
-                            Record
-                        </button>
-                    )}
-
-                    <button
-                        onClick={() => setScreenShareActive(!screenShareActive)}
-                        className={`p-2 rounded-lg transition-colors flex items-center gap-1 ${screenShareActive ? 'bg-blue-500/30' : 'hover:bg-white/20'
-                            }`}
-                        title="Share screen"
-                    >
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                            <rect x="2" y="3" width="20" height="14" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
-                            <path d="M2 17h20" stroke="currentColor" strokeWidth="2" />
-                            <path d="M6 21h12" stroke="currentColor" strokeWidth="2" />
-                        </svg>
-                        Share
-                    </button>
-
-                    <button
-                        onClick={handleLeaveRoom}
-                        className="p-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 transition-colors"
-                        title="Leave call"
-                    >
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M16.6915026,12.4744748 L3.50612381,13.2599618 C3.19218622,13.2599618 3.03521743,13.4170592 3.03521743,13.5741566 L1.15159189,20.0151496 C0.8376543,20.8006365 0.99,21.89 1.77946707,22.52 C2.41,22.99 3.50612381,23.1 4.13399899,22.8429026 L21.714504,14.0454487 C22.6563168,13.5741566 23.1272231,12.6315722 22.9702544,11.6889879 L4.13399899,1.16346273 C3.34915502,0.9 2.40734225,1.00636533 1.77946707,1.4776575 C0.994623095,2.10604706 0.837654326,3.0486314 1.15159189,3.99021575 L3.03521743,10.4311088 C3.03521743,10.5882061 3.34915502,10.7453035 3.50612381,10.7453035 L16.6915026,11.5307905 C16.6915026,11.5307905 17.1624089,11.5307905 17.1624089,12.0020827 C17.1624089,12.4744748 16.6915026,12.4744748 16.6915026,12.4744748 Z" />
-                        </svg>
-                        Leave
-                    </button>
-                </div>
-            </div>
         </div>
     );
 }
@@ -286,7 +368,7 @@ export function SimpleVideoCallUI({ channelId, channelName, onClose, theme = 'da
     const [callDuration, setCallDuration] = useState(0);
 
     return (
-        <div className={`w-full h-96 ${theme === 'dark' ? 'bg-gradient-to-br from-slate-900 to-slate-800' : 'bg-gradient-to-br from-gray-100 to-gray-200'} rounded-lg p-6 flex flex-col`}>
+        <div className={`w-full h-full ${theme === 'dark' ? 'bg-gradient-to-br from-[#0f0f11] to-[#1a1b1e]' : 'bg-gradient-to-br from-gray-100 to-gray-200'} p-6 flex flex-col`}>
             <div className="flex items-center justify-between mb-4">
                 <div>
                     <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>{channelName} - Video Call</h3>

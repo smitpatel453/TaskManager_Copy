@@ -13,9 +13,16 @@ export const api = axios.create({
 api.interceptors.request.use((config) => {
   const isBrowser = typeof window !== "undefined" && typeof localStorage !== "undefined";
   const token = isBrowser ? localStorage.getItem("token") : null;
+
   if (token) {
-    config.headers = config.headers ?? {};
-    config.headers.Authorization = `Bearer ${token}`;
+    // Ensure token is a string, not an object
+    const tokenStr = typeof token === 'string' ? token : String(token);
+    if (tokenStr && tokenStr !== 'null' && tokenStr !== 'undefined' && !tokenStr.includes('[object')) {
+      config.headers = config.headers ?? {};
+      config.headers.Authorization = `Bearer ${tokenStr}`;
+    } else {
+      console.warn('Invalid token format detected:', { type: typeof token, value: token });
+    }
   }
   return config;
 });

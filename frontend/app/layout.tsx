@@ -3,6 +3,7 @@ import { Inter, Crimson_Pro } from "next/font/google";
 import "./global.css";
 import ReactQueryProvider from "./providers/ReactQueryProvider";
 import { SocketProvider } from "./providers/SocketProvider";
+import { GlobalIncomingCallBanner } from "./components/videocalls/IncomingCallBanner";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -34,7 +35,11 @@ export default function RootLayout({
         className={`${inter.variable} ${crimsonPro.variable} font-ui antialiased`}
       >
         <ReactQueryProvider>
-          <SocketProvider>{children}</SocketProvider>
+          <SocketProvider>
+            {children}
+            {/* Global incoming call notification — visible on every page */}
+            <GlobalIncomingCallBanner />
+          </SocketProvider>
         </ReactQueryProvider>
       </body>
     </html>

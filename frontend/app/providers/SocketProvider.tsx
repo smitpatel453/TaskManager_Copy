@@ -14,6 +14,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     const [socket, setSocket] = useState<Socket | null>(null);
     const [isConnected, setIsConnected] = useState(false);
     const socketRef = useRef<Socket | null>(null);
+    const joinedChannelsRef = useRef<Set<string>>(new Set());
 
     useEffect(() => {
         // Only initialize socket once on mount
@@ -22,7 +23,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
         }
 
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
             if (!token) {
                 console.warn('No auth token found, socket will not connect');
@@ -45,19 +46,51 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
                 setIsConnected(true);
             });
 
-            newSocket.on('disconnect', () => {
-                console.log('❌ Socket disconnected');
+            newSocket.on('disconnect', (reason) => {
+                console.log('❌ Socket disconnected:', reason);
                 setIsConnected(false);
             });
 
             newSocket.on('reconnect', () => {
                 console.log('🔄 Socket reconnected');
                 setIsConnected(true);
+
+                // Auto-rejoin channels after reconnection
+                if (joinedChannelsRef.current.size > 0) {
+                    console.log(`📡 Auto-rejoining ${joinedChannelsRef.current.size} channels...`);
+                    joinedChannelsRef.current.forEach((channelId) => {
+                        newSocket.emit('join_channel', channelId);
+                        console.log(`  ↳ Rejoined channel: ${channelId}`);
+                    });
+                }
+            });
+
+            newSocket.on('reconnect_attempt', () => {
+                console.log('🔄 Attempting to reconnect...');
+            });
+
+            newSocket.on('reconnect_error', (error) => {
+                console.error('⚠️ Reconnection error:', error);
+            });
+
+            newSocket.on('reconnect_failed', () => {
+                console.error('❌ Failed to reconnect after max attempts');
             });
 
             newSocket.on('connect_error', (error) => {
                 console.error('⚠️ Socket connection error:', error);
             });
+
+            // Track join_channel emissions for auto-rejoin on reconnect
+            const originalEmit = newSocket.emit.bind(newSocket);
+            newSocket.emit = function (eventName: string, ...args: any[]) {
+                if (eventName === 'join_channel' && typeof args[0] === 'string') {
+                    joinedChannelsRef.current.add(args[0]);
+                } else if (eventName === 'leave_channel' && typeof args[0] === 'string') {
+                    joinedChannelsRef.current.delete(args[0]);
+                }
+                return originalEmit(eventName, ...args);
+            } as any;
 
             socketRef.current = newSocket;
             setSocket(newSocket);

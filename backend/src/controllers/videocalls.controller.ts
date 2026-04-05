@@ -37,9 +37,23 @@ export async function startChannelVideoCall(req: Request, res: Response): Promis
         const roomName = liveKitService.generateRoomName(channelId);
 
         // Generate access token for this user
-        const { token, url } = liveKitService.generateLiveKitToken({
+        const { token, url } = await liveKitService.generateLiveKitToken({
             userId: userId.toString(),
             userName: `${user.firstName} ${user.lastName}`,
+            roomName,
+        });
+
+        // Validate token was generated
+        if (!token || typeof token !== 'string' || token.length < 50) {
+            console.error('❌ Invalid token generated:', { type: typeof token, length: token?.length });
+            res.status(500).json({ error: 'Failed to generate valid authentication token' });
+            return;
+        }
+
+        console.log('✅ Valid token generated:', {
+            tokenLength: token.length,
+            tokenPreview: token.substring(0, 50) + '...',
+            url,
             roomName,
         });
 
@@ -135,9 +149,22 @@ export async function joinChannelVideoCall(req: Request, res: Response): Promise
         const roomName = channel.activeCall.roomName;
 
         // Generate access token for this user to join the existing room
-        const { token, url } = liveKitService.generateLiveKitToken({
+        const { token, url } = await liveKitService.generateLiveKitToken({
             userId: userId.toString(),
             userName: `${user.firstName} ${user.lastName}`,
+            roomName,
+        });
+
+        // Validate token was generated
+        if (!token || typeof token !== 'string' || token.length < 50) {
+            console.error('❌ Invalid token generated for join:', { type: typeof token, length: token?.length });
+            res.status(500).json({ error: 'Failed to generate valid authentication token' });
+            return;
+        }
+
+        console.log('✅ Valid join token generated:', {
+            tokenLength: token.length,
+            tokenPreview: token.substring(0, 50) + '...',
             roomName,
         });
 
@@ -250,26 +277,39 @@ export async function leaveChannelVideoCall(req: Request, res: Response): Promis
             return;
         }
 
-        const objectId = new mongoose.Types.ObjectId(userId);
-
         // Remove user from participants
         channel.activeCall.participants = channel.activeCall.participants.filter(
             (p: any) => p.toString() !== userId
         );
 
+        // Check if this was the last participant
+        const wasLastParticipant = channel.activeCall.participants.length === 0;
+
         // If no participants left, end the call
-        if (channel.activeCall.participants.length === 0) {
+        if (wasLastParticipant) {
             channel.activeCall = null;
         }
 
         await channel.save();
 
-        // Notify others that user left
+        // Notify others
         const io = getIO();
-        io.to(channelId).emit('channel:call-user-left', {
-            channelId,
-            userId,
-        });
+
+        if (wasLastParticipant) {
+            // If this was the last participant, emit call-ended so all clients know the call is over
+            io.to(channelId).emit('channel:call-ended', {
+                channelId,
+                endedBy: userId,
+                endedAt: new Date(),
+                reason: 'last_participant_left',
+            });
+        } else {
+            // Otherwise, just notify that a user left
+            io.to(channelId).emit('channel:call-user-left', {
+                channelId,
+                userId,
+            });
+        }
 
         res.json({ success: true, message: 'Left the call' });
     } catch (error) {
