@@ -80,7 +80,7 @@ const navItems = [
   },
   {
     id: "tasks",
-    label: "My Tasks",
+    label: "Tasks",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -262,6 +262,8 @@ export default function Sidebar({ userRole }: SidebarProps) {
   // Channels state
   const [channels, setChannels] = useState<StoredChannel[]>([]);
   const [channelsOpen, setChannelsOpen] = useState(true);
+  const [channelsExpanded, setChannelsExpanded] = useState(false);
+  const CHANNEL_SIDEBAR_LIMIT = 4;
 
   // Create-channel modal
   const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
@@ -615,7 +617,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
         { label: "Inbox", href: "/dashboard", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" /></svg> },
         { label: "Replies", href: "/dashboard", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 00-4-4H4" /></svg> },
         { label: "Assigned Comments", href: "/dashboard", icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg> },
-        { label: "My Tasks", href: "/dashboard/tasks", icon: <ClipboardDocumentListIcon className="w-3.5 h-3.5" /> },
+        { label: "Tasks", href: "/dashboard/tasks", icon: <ClipboardDocumentListIcon className="w-3.5 h-3.5" /> },
       ].map((item) => (
         <ContentPanelItem key={item.label} href={item.href} label={item.label} icon={item.icon} active={pathname === item.href && item.href !== "/dashboard"} onNavigate={navigateTo} />
       ))}
@@ -636,7 +638,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
 
       {isMounted && channelsOpen && (
         <div className="space-y-0.5 mt-1">
-          {visibleChannels.map((chan) => {
+          {visibleChannels.slice(0, channelsExpanded ? undefined : CHANNEL_SIDEBAR_LIMIT).map((chan) => {
             const channelId = ((chan as { id?: string; channelId?: string }).id || (chan as { id?: string; channelId?: string }).channelId || "").toLowerCase();
             const isActive = pathname === `/dashboard/channels/${channelId}`;
             const isJoined = !!(chan.joined || (!!currentUserId && (chan.joinedMemberIds || []).includes(currentUserId)));
@@ -682,6 +684,14 @@ export default function Sidebar({ userRole }: SidebarProps) {
               </div>
             );
           })}
+          {visibleChannels.length > CHANNEL_SIDEBAR_LIMIT && (
+            <button
+              onClick={() => setChannelsExpanded(!channelsExpanded)}
+              className="w-full text-left px-2 py-1.5 text-[11px] font-medium text-[var(--accent)] hover:bg-[var(--bg-surface-2)] rounded-md transition-colors"
+            >
+              {channelsExpanded ? "Show less" : " More.."}
+            </button>
+          )}
           <button
             onClick={openChannelModal}
             className="flex items-center gap-2 px-2 py-1.5 w-full text-left hover:bg-[var(--bg-surface-2)] rounded-md transition-colors group"
@@ -689,6 +699,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
             <PlusIcon className="w-3.5 h-3.5 text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)] transition-colors" />
             <span className="text-[12px] text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)] transition-colors">Add Channel</span>
           </button>
+          
         </div>
       )}
 
@@ -889,7 +900,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
   const renderTasksPanel = () => (
     <div className="flex-1 overflow-y-auto py-3 ck-scrollbar px-2">
       <div className="px-2 pb-3">
-        <span className="text-[13px] font-semibold text-[var(--text-primary)]">My Tasks</span>
+        <span className="text-[13px] font-semibold text-[var(--text-primary)]">Tasks</span>
       </div>
       <div className="space-y-0.5">
         {isMounted && (
@@ -1069,7 +1080,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
 
           {/* Workspace avatar */}
           <button
-            className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-[11px] font-bold mb-3 shadow-lg hover:shadow-purple-500/25 transition-all hover:scale-105"
+            className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-indigo-600 flex items-center justify-center text-white text-[11px] font-bold mb-3 shadow-lg"
             title={user ? `${user.firstName}'s Workspace` : "Workspace"}
           >
             {user?.firstName?.charAt(0) || "W"}
@@ -1138,30 +1149,6 @@ export default function Sidebar({ userRole }: SidebarProps) {
 
         {/* Right content panel */}
         <div className="w-[220px] bg-[var(--bg-surface)] border-r border-[var(--border-subtle)] flex flex-col flex-shrink-0">
-
-          {/* Workspace header */}
-          <div className="h-[52px] border-b border-[var(--border-subtle)] flex items-center justify-between px-3 flex-shrink-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-5 h-5 rounded bg-gradient-to-br from-purple-500 to-indigo-600 flex-shrink-0 flex items-center justify-center text-white text-[9px] font-bold">
-                {user?.firstName?.charAt(0) || "W"}
-              </div>
-              <span className="text-[12px] font-semibold text-[var(--text-primary)] truncate">
-                {user ? `${user.firstName}'s Workspace` : "Workspace"}
-              </span>
-            </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <button
-                className="p-1 rounded hover:bg-[var(--bg-surface-2)] text-[var(--text-muted)]"
-                onClick={() => setActivePanel("home")}
-              >
-                <EllipsisHorizontalIcon className="w-3.5 h-3.5" />
-              </button>
-              <button className="p-1 rounded hover:bg-[var(--bg-surface-2)] text-[var(--text-muted)]">
-                <PlusIcon className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-
           {/* Panel content */}
           {renderPanel()}
 

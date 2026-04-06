@@ -414,7 +414,7 @@ export default function ChannelPage() {
         if (data.channelId === normalizedChannelId) {
           // Ignore if the current user initiated the call
           if (currentUser && data.initiator?.id === currentUser._id) return;
-          
+
           setIncomingCallNotice({ initiatorName: data.initiator?.name || 'Someone' });
           // Auto-dismiss after 20 seconds
           setTimeout(() => setIncomingCallNotice(null), 20000);
@@ -501,7 +501,7 @@ export default function ChannelPage() {
       mentions: mentionIds,
       attachments: pendingAttachments,
     });
-    
+
     // Stop typing indicator on send
     socket.emit("typing_stop", { channelId: normalizedChannelId });
     if (typingTimeoutRef.current) {
@@ -540,7 +540,7 @@ export default function ChannelPage() {
       } else {
         clearTimeout(typingTimeoutRef.current);
       }
-      
+
       typingTimeoutRef.current = setTimeout(() => {
         socket.emit("typing_stop", { channelId: normalizedChannelId });
         typingTimeoutRef.current = null;
@@ -944,7 +944,7 @@ export default function ChannelPage() {
                           )}
 
                           <div className={`rounded-2xl px-4 py-2 ${group.isMe
-                            ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-br-sm shadow-sm"
+                            ? "bg-[var(--bg-surface)] text-[var(--text-primary)] rounded-br-sm border border-[var(--border-subtle)] shadow-sm"
                             : "bg-[var(--bg-surface-2)] text-[var(--text-primary)] rounded-bl-sm border border-[var(--border-subtle)]"
                             }`}>
                             <div className="space-y-1">
@@ -967,39 +967,27 @@ export default function ChannelPage() {
                                             target="_blank"
                                             rel="noreferrer"
                                             className={`flex items-center gap-3 w-[280px] rounded-lg p-2.5 shadow-sm transition-all group no-underline ${group.isMe
-                                              ? "bg-blue-900/30 hover:bg-blue-800/40 border border-blue-400/20"
+                                              ? "bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-2)] border border-[var(--border-subtle)]"
                                               : "bg-[var(--bg-surface-2)] hover:bg-[var(--bg-surface-3)] border border-[var(--border-subtle)]"
                                               }`}
                                           >
-                                            {/* Rich Document Icon */}
-                                            <div className="relative flex-shrink-0">
-                                              <div className="w-8 h-10 bg-white rounded flex flex-col overflow-hidden shadow-sm border border-gray-900/10 items-center justify-end group-hover:scale-105 transition-transform">
-                                                {/* Folded corner */}
-                                                <div className="absolute top-0 right-0 w-3 h-3 bg-black/5 backdrop-blur-sm border-l border-b border-gray-300/50 rounded-bl shadow-sm"></div>
-                                                
-                                                {/* Bottom colored bar based on file type */}
-                                                <div className={`w-full h-3.5 ${isPdf ? 'bg-[#f40f02]' : 'bg-[#1a73e8]'} flex items-center justify-center mb-1 relative`}>
-                                                  {/* Abstract icon shapes inside the bar */}
-                                                  <div className="absolute left-1 flex gap-0.5">
-                                                    <div className="w-1.5 h-1.5 bg-white rounded-sm opacity-90"></div>
-                                                    <div className="w-2.5 h-1 bg-white rounded-sm mt-0.5 opacity-90"></div>
-                                                  </div>
-                                                </div>
-                                              </div>
+                                            {/* Document Icon */}
+                                            <div className="relative flex-shrink-0 transition-transform">
+                                              <img src="/doc-icon.png" alt="Document" className="w-10 h-10 object-contain" />
                                             </div>
-                                            
+
                                             {/* Text Content */}
                                             <div className="flex flex-col flex-1 overflow-hidden">
-                                              <span className={`text-[13px] font-bold truncate leading-tight mb-0.5 ${group.isMe ? 'text-white' : 'text-[var(--text-primary)]'}`}>
+                                              <span className={`text-[13px] font-bold truncate leading-tight mb-0.5 text-[var(--text-primary)]`}>
                                                 {file.fileName}
                                               </span>
-                                              <span className={`text-[11px] leading-tight truncate ${group.isMe ? 'text-blue-100/70' : 'text-[var(--text-tertiary)]'}`}>
+                                              <span className={`text-[11px] leading-tight truncate text-[var(--text-tertiary)]`}>
                                                 {isPdf ? 'PDF Document' : 'Document'} • Click to view
                                               </span>
                                             </div>
-                                            
+
                                             {/* Download/View Icon */}
-                                            <div className={`flex items-center justify-center w-6 h-6 rounded-full flex-shrink-0 transition-colors ${group.isMe ? 'bg-blue-600/50 group-hover:bg-blue-500/60 text-white' : 'bg-[var(--bg-surface)] border border-[var(--border-subtle)] group-hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)]'}`}>
+                                            <div className="flex items-center justify-center w-6 h-6 rounded-full flex-shrink-0 transition-colors bg-[var(--bg-surface)] border border-[var(--border-subtle)] group-hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)]">
                                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                               </svg>
@@ -1032,22 +1020,22 @@ export default function ChannelPage() {
         {/* Typing Indicator */}
         {typingUsers.size > 0 && !showVideoCall && (
           <div className="px-6 pb-2 flex items-center animate-toast-in">
-             <div className="flex -space-x-2 mr-3">
-                {Array.from(typingUsers).map((userId) => {
-                   const member = allUsers.find(u => u._id === userId) || members.find(m => m._id === userId);
-                   if (!member) return null;
-                   return (
-                     <div key={userId} className="relative z-10 rounded-full ring-2 ring-[var(--bg-canvas)]">
-                       <Avatar name={`${member.firstName} ${member.lastName}`} size="sm" />
-                     </div>
-                   );
-                })}
-             </div>
-             <div className="bg-[var(--bg-surface-2)] rounded-full px-3.5 py-2 shadow-sm border border-[var(--border-subtle)] flex items-center gap-1.5 rounded-bl-sm">
-               <span className="w-1.5 h-1.5 bg-[var(--text-tertiary)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-               <span className="w-1.5 h-1.5 bg-[var(--text-tertiary)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-               <span className="w-1.5 h-1.5 bg-[var(--text-tertiary)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-             </div>
+            <div className="flex -space-x-2 mr-3">
+              {Array.from(typingUsers).map((userId) => {
+                const member = allUsers.find(u => u._id === userId) || members.find(m => m._id === userId);
+                if (!member) return null;
+                return (
+                  <div key={userId} className="relative z-10 rounded-full ring-2 ring-[var(--bg-canvas)]">
+                    <Avatar name={`${member.firstName} ${member.lastName}`} size="sm" />
+                  </div>
+                );
+              })}
+            </div>
+            <div className="bg-[var(--bg-surface-2)] rounded-full px-3.5 py-2 shadow-sm border border-[var(--border-subtle)] flex items-center gap-1.5 rounded-bl-sm">
+              <span className="w-1.5 h-1.5 bg-[var(--text-tertiary)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+              <span className="w-1.5 h-1.5 bg-[var(--text-tertiary)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+              <span className="w-1.5 h-1.5 bg-[var(--text-tertiary)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+            </div>
           </div>
         )}
 
@@ -1098,23 +1086,11 @@ export default function ChannelPage() {
                         className="flex items-center justify-between w-[320px] rounded-lg bg-[var(--bg-surface-2)] p-2.5 shadow border border-[var(--border-subtle)] group"
                       >
                         <div className="flex items-center gap-3">
-                          {/* Rich Document Icon */}
-                          <div className="relative flex-shrink-0 mt-0.5">
-                            <div className="w-8 h-10 bg-white rounded flex flex-col overflow-hidden shadow-sm border border-gray-200/20 items-center justify-end group-hover:scale-105 transition-transform">
-                              {/* Folded corner */}
-                              <div className="absolute top-0 right-0 w-3 h-3 bg-[var(--bg-surface-2)] border-l border-b border-gray-300 rounded-bl shadow-sm"></div>
-                              
-                              {/* Bottom colored bar based on file type */}
-                              <div className={`w-full h-4 ${isPdf ? 'bg-[#f40f02]' : 'bg-[#1a73e8]'} flex items-center justify-center mb-1 relative`}>
-                                {/* Abstract icon shapes inside the bar */}
-                                <div className="absolute left-1 flex gap-0.5">
-                                  <div className="w-1.5 h-1.5 bg-white rounded-sm opacity-90"></div>
-                                  <div className="w-2.5 h-1 bg-white rounded-sm mt-0.5 opacity-90"></div>
-                                </div>
-                              </div>
-                            </div>
+                          {/* Document Icon */}
+                          <div className="flex-shrink-0 mt-0.5">
+                            <img src="/doc-icon.png" alt="Document" className="w-10 h-10 object-contain" />
                           </div>
-                          
+
                           {/* Text Content */}
                           <div className="flex flex-col flex-1 overflow-hidden">
                             <span className="text-[13px] font-bold text-white truncate leading-tight mb-0.5">
@@ -1125,7 +1101,7 @@ export default function ChannelPage() {
                             </span>
                           </div>
                         </div>
-                        
+
                         {/* Close Button */}
                         <button
                           onClick={() => removePendingAttachment(index)}
