@@ -9,6 +9,11 @@ export interface UserDocument extends Document {
     emailVerified?: boolean;
     emailVerifiedAt?: Date;
     createdAt: Date;
+    slackIntegration?: {
+        accessToken: string;
+        teamId: string;
+        teamName: string;
+    };
 }
 
 const userSchema = new Schema<UserDocument>(
@@ -20,6 +25,11 @@ const userSchema = new Schema<UserDocument>(
         role: { type: Schema.Types.ObjectId, ref: "roles" },
         emailVerified: { type: Boolean, default: false },
         emailVerifiedAt: { type: Date },
+        slackIntegration: {
+            accessToken: { type: String },
+            teamId: { type: String },
+            teamName: { type: String },
+        }
     },
     {
         timestamps: true,
@@ -28,7 +38,6 @@ const userSchema = new Schema<UserDocument>(
 );
 
 // Create indexes for better query performance
-userSchema.index({ email: 1 }); // For finding users by email (unique constraint already creates index)
 userSchema.index({ role: 1 }); // For filtering users by role
 userSchema.index({ createdAt: -1 }); // For sorting by creation date
 userSchema.index({ firstName: 1, lastName: 1 }); // For searching by name

@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import path from 'path';
 import fs from 'fs/promises';
 import { getIO } from '../infrastructure/socket.js';
+import { UserMongooseModel } from '../models/user.model.js';
 
 type ChannelUser = {
   _id: string;
@@ -558,18 +559,55 @@ export const getChannelMentionSuggestions = async (req: Request, res: Response) 
 
 export const getChannelUsers = async (_req: Request, res: Response) => {
   try {
-    const db = mongoose.connection.db;
-    if (!db) {
-      res.status(500).json({ error: 'Database connection failed' });
-      return;
-    }
-    const users = await db
-      .collection('users')
-      .find({}, { projection: { _id: 1, firstName: 1, lastName: 1, email: 1 } })
-      .toArray();
+    const users = await UserMongooseModel.find(
+      {},
+      { _id: 1, firstName: 1, lastName: 1, email: 1 }
+    ).lean();
     res.status(200).json(users);
   } catch (error) {
     console.error('Error fetching users for channels:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
+  }
+};
+
+import { addSlackImportJob } from '../workers/slackImport.queue.js';
+
+export const importSlackChannel = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const { channelId } = req.params;
+    const channel = await ChannelModel.findOne({ channelId }).lean() as ChannelLean | null;
+    if (!channel) {
+      res.status(404).json({ error: 'Channel not found' });
+      return;
+    }
+
+    if (!canAccessChannel(channel, userId)) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    const { slackChannelId } = req.body;
+    if (!slackChannelId || typeof slackChannelId !== 'string') {
+      res.status(400).json({ error: 'Missing or invalid slackChannelId in body' });
+      return;
+    }
+
+    // Add to BullMQ Slack Import queue
+    const job = await addSlackImportJob(channelId, slackChannelId, userId);
+
+    res.status(202).json({ 
+      message: 'Processing started', 
+      jobId: job.id, 
+      channelId 
+    });
+  } catch (error) {
+    console.error('Error starting slack import:', error);
+    res.status(500).json({ error: 'Failed to queue import task' });
   }
 };

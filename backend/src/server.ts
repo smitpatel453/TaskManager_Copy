@@ -5,6 +5,7 @@ import { createServer } from "http";
 import { initializeSocket } from "./infrastructure/socket.js";
 import { startCallMonitor } from "./services/callMonitor.service.js";
 import { startMaintenanceService } from "./services/maintenance.service.js";
+import { startSlackImportWorker } from "./workers/slackImport.worker.js";
 
 // Connect to MongoDB
 connectDB()
@@ -24,6 +25,9 @@ connectDB()
 
       // Start maintenance service (cleanup old call history)
       startMaintenanceService();
+
+      // Start the BullMQ Slack Import Background Worker
+      startSlackImportWorker();
     });
   })
   .catch((error) => {

@@ -34,7 +34,6 @@ projectSchema.index({ assignedUsers: 1 }); // For finding projects by assigned u
 projectSchema.index({ projectName: 1 }); // For searching by project name
 projectSchema.index({ createdAt: -1 }); // For sorting by creation date
 projectSchema.index({ createdBy: 1, createdAt: -1 }); // Compound index for user's projects sorted by date
-projectSchema.index({ teamId: 1 }); // For listing projects by team
 
 const Project = mongoose.models.projects || mongoose.model<ProjectDocument>("projects", projectSchema);
 

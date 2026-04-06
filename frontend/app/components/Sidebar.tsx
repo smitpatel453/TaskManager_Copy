@@ -263,6 +263,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
   const [channels, setChannels] = useState<StoredChannel[]>([]);
   const [channelsOpen, setChannelsOpen] = useState(true);
   const [channelsExpanded, setChannelsExpanded] = useState(false);
+  const [channelSearch, setChannelSearch] = useState("");
   const CHANNEL_SIDEBAR_LIMIT = 4;
 
   // Create-channel modal
@@ -517,8 +518,10 @@ export default function Sidebar({ userRole }: SidebarProps) {
   };
 
   const visibleChannels = useMemo(() => {
-    return channels;
-  }, [channels]);
+    if (!channelSearch.trim()) return channels;
+    const query = channelSearch.toLowerCase().trim();
+    return channels.filter((c) => c.name.toLowerCase().includes(query));
+  }, [channels, channelSearch]);
 
   const toggleMember = (u: ChannelMember) => {
     setSelectedMembers((prev) =>
@@ -635,6 +638,24 @@ export default function Sidebar({ userRole }: SidebarProps) {
           <PlusIcon className="w-3 h-3" />
         </button>
       </div>
+
+      {channelsOpen && (
+        <div className="px-2 mt-1 mb-1.5">
+          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-canvas)] focus-within:border-[var(--border-default)] transition-colors">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--text-muted)] flex-shrink-0">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M20 20l-3-3" />
+            </svg>
+            <input
+              type="text"
+              value={channelSearch}
+              onChange={(e) => setChannelSearch(e.target.value)}
+              placeholder="Search channels"
+              className="no-focus-ring w-full bg-transparent border-0 outline-none focus:outline-none focus-visible:outline-none text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+            />
+          </div>
+        </div>
+      )}
 
       {isMounted && channelsOpen && (
         <div className="space-y-0.5 mt-1">

@@ -33,10 +33,15 @@ export function startCallMonitor() {
             if (activeChannels.length === 0) return;
 
             for (const channel of activeChannels) {
-                if (!channel.activeCall) continue;
+                if (!channel.activeCall?.startedAt) {
+                    console.warn(`⚠️ Call in ${channel.channelId} has no start time - auto-ending`);
+                    channel.activeCall = null;
+                    await channel.save();
+                    continue;
+                }
 
                 const callDuration =
-                    (Date.now() - channel.activeCall.startedAt.getTime()) / 1000 / 60; // in minutes
+                    (Date.now() - new Date(channel.activeCall.startedAt).getTime()) / 1000 / 60; // in minutes
                 const maxDuration = ENV.MAX_CALL_DURATION_MINUTES;
                 const warningThreshold = ENV.CALL_WARNING_THRESHOLD_MINUTES;
 

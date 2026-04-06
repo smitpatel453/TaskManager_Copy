@@ -2,6 +2,7 @@ import { ENV } from "../config/env.js";
 
 const allowedOrigins: string[] = [
   "http://localhost:3000",
+  "http://127.0.0.1:3000",
   "http://192.168.1.6:3000",
   ...(ENV.FRONTEND_URL ? [ENV.FRONTEND_URL] : []),
 ];

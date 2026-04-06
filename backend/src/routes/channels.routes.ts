@@ -12,6 +12,7 @@ import {
     getChannelUsers,
     joinChannel,
     uploadChannelFiles,
+    importSlackChannel,
 } from '../controllers/channels.controller.js';
 
 const router = Router();
@@ -32,5 +33,7 @@ router.get('/:channelId/messages', getChannelMessages);
 router.post('/:channelId/messages', createChannelMessage);
 router.post('/:channelId/uploads', upload.array('files', 5), uploadChannelFiles);
 router.get('/:channelId/mentions', getChannelMentionSuggestions);
+
+router.post('/:channelId/import-slack', importSlackChannel);
 
 export default router;

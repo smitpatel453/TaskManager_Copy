@@ -13,6 +13,7 @@ import dashboardRoutes from "./routes/dashboard.routes.js";
 import channelsRoutes from "./routes/channels.routes.js";
 import videocallsRoutes from "./routes/videocalls.routes.js";
 import webhookRoutes from "./routes/webhooks.routes.js";
+import integrationsRoutes from "./routes/integrations.routes.js";
 import connectDB from "./infrastructure/database/mongodb.js";
 
 const AUTH_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
@@ -58,6 +59,7 @@ export function createApp() {
   app.use("/api/dashboard", dashboardRoutes);
   app.use("/api/channels", channelsRoutes);
   app.use("/api/videocalls", videocallsRoutes);
+  app.use("/api/integrations", integrationsRoutes);
   // Error handling middleware
   app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     console.error("Unhandled error:", err);
