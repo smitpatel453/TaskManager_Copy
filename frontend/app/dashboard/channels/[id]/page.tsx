@@ -20,7 +20,6 @@ import {
   type ChannelMessage,
   type ChannelUser,
 } from "../../../../src/api/channels.api";
-import { integrationsApi } from "../../../../src/api/integrations.api";
 import { ChannelVideoCall } from "../../../components/videocalls/ChannelVideoCall";
 import { ChannelCallPrompt } from "../../../components/videocalls/ChannelCallPrompt";
 
@@ -284,53 +283,10 @@ export default function ChannelPage() {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const memberSearchRef = useRef<HTMLInputElement>(null);
-
-  const [isSlackImporting, setIsSlackImporting] = useState(false);
-  const [slackConnected, setSlackConnected] = useState(false);
-  const [slackOAuthUrl, setSlackOAuthUrl] = useState<string | null>(null);
-  const [availableSlackChannels, setAvailableSlackChannels] = useState<{ id: string, name: string }[]>([]);
-  const [selectedSlackChannel, setSelectedSlackChannel] = useState<string>('');
-  const [importedSlackChannel, setImportedSlackChannel] = useState<{ id: string, name: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toasts, add: addToast, remove: removeToast } = useToast();
 
   const quickEmojis = ["😀", "😂", "😍", "🔥", "👍", "🎉", "✅", "🙏", "👀", "🤝", "❤️", "🚀"];
-
-  // Slack API Integration setup
-  const checkSlackAuth = async () => {
-    try {
-      const res = await integrationsApi.getSlackChannels();
-      setSlackConnected(true);
-      setAvailableSlackChannels(res.channels);
-      addToast("Slack connected successfully!", "success");
-    } catch (err: any) {
-      if (err.response?.status === 401) {
-        setSlackConnected(false);
-        try {
-          const authRes = await integrationsApi.getSlackAuthUrl();
-          setSlackOAuthUrl(authRes.url);
-        } catch (e) {
-          console.error("Failed to get Slack auth URL:", e);
-        }
-      } else {
-        console.error("Failed to check Slack auth:", err);
-      }
-    }
-  };
-
-  useEffect(() => {
-    checkSlackAuth();
-
-    const handleMessage = (event: MessageEvent) => {
-      console.log("Message received:", event.data);
-      if (event.data === 'slack-auth-success') {
-        console.log("Slack auth success message received, refreshing...");
-        checkSlackAuth();
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
 
   /* ---------- scroll to bottom ---------- */
   const scrollToBottom = useCallback(() => {
@@ -450,38 +406,7 @@ export default function ChannelPage() {
         });
       });
 
-      socket.on("slack_import_progress", (data: any) => {
-        console.log('[slack_import_progress]', data);
-        if (data.status === 'started') {
-            addToast("Slack import started...", "info");
-            setIsSlackImporting(true);
-        } else if (data.status === 'processing') {
-            setIsSlackImporting(true);
-        } else if (data.status === 'completed') {
-            addToast(`Import complete! Loaded ${data.totalImported} messages.`, "success");
-            setIsSlackImporting(false);
-        } else if (data.status === 'error') {
-            addToast(`Import failed: ${data.error}`, "error");
-            setIsSlackImporting(false);
-        }
-      });
 
-      socket.on("channel_logs_updated", async (data: any) => {
-        console.log('[channel_logs_updated] Received event, fetching messages...', data);
-        try {
-            console.log(`[channel_logs_updated] Fetching messages for channel: ${normalizedChannelId}`);
-            const history = await channelsApi.getMessages(normalizedChannelId);
-            console.log(`[channel_logs_updated] Got ${history.length} messages`);
-            setMessages(history as Message[]);
-            // Keep the imported channel banner visible for feedback
-            // Don't clear it immediately - user will see the banner showing what was imported
-            addToast(`Imported messages loaded!`, "success");
-        } catch(e) {
-            console.error('[channel_logs_updated] Failed to fetch messages:', e);
-            addToast(`Failed to load imported messages`, "error");
-            setImportedSlackChannel(null);
-        }
-      });
 
       socket.on("channel_presence_updated", handlePresenceUpdated);
 
@@ -525,8 +450,6 @@ export default function ChannelPage() {
       mounted = false;
       if (socket) {
         socket.off("receive_message");
-        socket.off("slack_import_progress");
-        socket.off("channel_logs_updated");
         socket.off("channel_presence_updated", handlePresenceUpdated);
         socket.off("channel:call-started");
         socket.off("channel:call-ended");
@@ -662,31 +585,7 @@ export default function ChannelPage() {
     }
   };
 
-  const handleSlackImport = async () => {
-    if (!selectedSlackChannel) {
-      addToast("Please select a Slack channel to import", "error");
-      return;
-    }
-    
-    setIsSlackImporting(true);
 
-    try {
-      addToast("Starting Slack import...", "info");
-      // Find the channel name from available channels
-      const selectedChannel = availableSlackChannels.find(ch => ch.id === selectedSlackChannel);
-      if (selectedChannel) {
-        setImportedSlackChannel(selectedChannel);
-      }
-      await integrationsApi.importSlackChannel(normalizedChannelId, selectedSlackChannel);
-      addToast("Import started! Processing messages...", "success");
-    } catch (error: any) {
-      console.error("Slack import error:", error);
-      addToast("Failed to start Slack import", "error");
-      setImportedSlackChannel(null);
-    } finally {
-      setIsSlackImporting(false);
-    }
-  };
 
   const removePendingAttachment = (index: number) => {
     setPendingAttachments((prev) => prev.filter((_, i) => i !== index));
@@ -963,24 +862,6 @@ export default function ChannelPage() {
 
         {/* Messages area */}
         <div className={`flex-1 overflow-y-auto px-0 py-0 space-y-0 ck-scrollbar ${showVideoCall ? 'hidden' : ''}`} id="messages-container">
-          {/* Slack Import Banner */}
-          {importedSlackChannel && messages.length > 0 && (
-            <div className="sticky top-0 z-10 bg-gradient-to-r from-[#E01E5A]/10 to-[#E01E5A]/5 border-b border-[#E01E5A]/30 px-5 py-3 text-center">
-              <div className="flex items-center justify-center gap-2 text-[13px] text-[#E01E5A] font-medium">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" />
-                </svg>
-                <span>Imported from Slack <strong>#{importedSlackChannel.name}</strong></span>
-                <button
-                  onClick={() => setImportedSlackChannel(null)}
-                  className="ml-auto text-[11px] font-medium px-2 py-1 rounded hover:bg-[#E01E5A]/20 transition-colors"
-                  title="Dismiss banner"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-          )}
 
           {!canAccessChannel ? (
             <div className="flex items-center justify-center h-full px-6 text-center">
@@ -1020,41 +901,6 @@ export default function ChannelPage() {
                   <PlusIcon className="w-4 h-4 text-[var(--text-secondary)]" />
                   Add People
                 </button>
-                {!slackConnected ? (
-                  <button 
-                    onClick={() => {
-                      if (slackOAuthUrl) {
-                        window.open(slackOAuthUrl, 'slackAuth', 'width=600,height=700');
-                      }
-                    }}
-                    className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-[var(--border-default)] text-[13px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-2)] transition-colors"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#E01E5A" />
-                    </svg>
-                    Connect Slack Integration
-                  </button>
-                ) : (
-                  <div className="flex w-full gap-2 text-left">
-                    <select
-                      value={selectedSlackChannel}
-                      onChange={(e) => setSelectedSlackChannel(e.target.value)}
-                      className="flex-1 py-2 px-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface)] text-[13px] text-[var(--text-primary)] outline-none"
-                    >
-                      <option value="">Select a channel...</option>
-                      {availableSlackChannels.map(ch => (
-                        <option key={ch.id} value={ch.id}>#{ch.name}</option>
-                      ))}
-                    </select>
-                    <button 
-                      onClick={handleSlackImport}
-                      disabled={isSlackImporting || !selectedSlackChannel}
-                      className="flex items-center justify-center px-4 rounded-lg bg-[#E01E5A] text-white text-[13px] font-medium hover:bg-[#C2164A] transition-colors disabled:opacity-50"
-                    >
-                      {isSlackImporting ? "Wait..." : "Import"}
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
           ) : (

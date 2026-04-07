@@ -31,7 +31,4 @@ export const ENV = {
   MAX_CALL_DURATION_MINUTES: parseInt(process.env.MAX_CALL_DURATION_MINUTES || "120", 10),
   CALL_WARNING_THRESHOLD_MINUTES: parseInt(process.env.CALL_WARNING_THRESHOLD_MINUTES || "110", 10),
   REDIS_URL: process.env.REDIS_URL || "redis://localhost:6379",
-  SLACK_CLIENT_ID: process.env.SLACK_CLIENT_ID,
-  SLACK_CLIENT_SECRET: process.env.SLACK_CLIENT_SECRET,
-  SLACK_REDIRECT_URI: process.env.SLACK_REDIRECT_URI || "http://localhost:3001/api/integrations/slack/callback",
 };

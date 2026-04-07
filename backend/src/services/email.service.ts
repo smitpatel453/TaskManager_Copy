@@ -198,4 +198,122 @@ export class EmailService {
       html,
     });
   }
+
+  async sendTaskAssignmentNotification(
+    to: string,
+    recipientName: string,
+    taskName: string,
+    assignerName: string
+  ): Promise<void> {
+    if (!this.transporter) {
+      return;
+    }
+
+    const escapeHtml = (value: string): string =>
+      value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
+    const safeRecipientName = escapeHtml(recipientName);
+    const safeTaskName = escapeHtml(taskName);
+    const safeAssignerName = escapeHtml(assignerName);
+
+    const text = [
+      `Hello ${recipientName},`,
+      "",
+      `${assignerName} has assigned you the task "${taskName}".`,
+      "",
+      "Please log in to the Task Manager to view the details.",
+    ].join("\n");
+
+    const html = `
+      <div style="background:#f7f7f9; padding:24px; font-family:Arial, sans-serif;">
+        <div style="max-width:600px; margin:0 auto; background:#ffffff; border-radius:10px; padding:24px; border:1px solid #e5e7eb;">
+          <div style="font-size:18px; font-weight:700; color:#111827; margin-bottom:12px;">Task Assigned</div>
+          <div style="font-size:14px; color:#374151; margin-bottom:16px;">Hello ${safeRecipientName},</div>
+          <div style="font-size:14px; color:#111827; margin-bottom:16px;">
+            ${safeAssignerName} has assigned you the task <strong>${safeTaskName}</strong>.
+          </div>
+          <div style="margin-top:20px; font-size:13px; color:#6b7280;">
+            Please log in to the Task Manager to view the details.
+          </div>
+        </div>
+      </div>
+    `;
+
+    await this.transporter.sendMail({
+      to,
+      from: ENV.SMTP_FROM,
+      subject: `Task assigned: ${taskName}`,
+      text,
+      html,
+    });
+  }
+
+  async sendTaskStatusChangeNotification(
+    to: string,
+    recipientName: string,
+    taskName: string,
+    updaterName: string,
+    newStatus: string,
+    previousStatus?: string
+  ): Promise<void> {
+    if (!this.transporter) {
+      return;
+    }
+
+    const escapeHtml = (value: string): string =>
+      value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
+    const safeRecipientName = escapeHtml(recipientName);
+    const safeTaskName = escapeHtml(taskName);
+    const safeUpdaterName = escapeHtml(updaterName);
+    const safeNewStatus = escapeHtml(newStatus);
+    const safePreviousStatus = previousStatus ? escapeHtml(previousStatus) : null;
+
+    const statusChangeText = safePreviousStatus
+      ? `${safeUpdaterName} changed the status of "${safeTaskName}" from ${safePreviousStatus} to ${safeNewStatus}.`
+      : `${safeUpdaterName} changed the status of "${safeTaskName}" to ${safeNewStatus}.`;
+
+    const text = [
+      `Hello ${recipientName},`,
+      "",
+      statusChangeText,
+      "",
+      "Please log in to the Task Manager for more details.",
+    ].join("\n");
+
+    const html = `
+      <div style="background:#f7f7f9; padding:24px; font-family:Arial, sans-serif;">
+        <div style="max-width:600px; margin:0 auto; background:#ffffff; border-radius:10px; padding:24px; border:1px solid #e5e7eb;">
+          <div style="font-size:18px; font-weight:700; color:#111827; margin-bottom:12px;">Task Status Updated</div>
+          <div style="font-size:14px; color:#374151; margin-bottom:16px;">Hello ${safeRecipientName},</div>
+          <div style="font-size:14px; color:#111827; margin-bottom:16px;">
+            ${statusChangeText}
+          </div>
+          ${safePreviousStatus ? `<div style="font-size:13px; color:#6b7280; margin-bottom:12px;">Previous status: <strong>${safePreviousStatus}</strong></div>` : ""}
+          <div style="font-size:13px; color:#6b7280; margin-bottom:16px;">New status: <strong>${safeNewStatus}</strong></div>
+          <div style="margin-top:20px; font-size:13px; color:#6b7280;">
+            Please log in to the Task Manager for more details.
+          </div>
+        </div>
+      </div>
+    `;
+
+    await this.transporter.sendMail({
+      to,
+      from: ENV.SMTP_FROM,
+      subject: `Task status changed: ${taskName}`,
+      text,
+      html,
+    });
+  }
 }

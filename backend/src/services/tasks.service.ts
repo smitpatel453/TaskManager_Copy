@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { TaskModel } from "../models/task.model.js";
 import { EmailService } from "./email.service.js";
+import { InboxService } from "./inbox.service.js";
 import type { CreateTaskRequest, DetailBlock, TaskStatus } from "../shared/types/index.js";
 
 function isValidTimeHHMM(value: unknown): value is string {
@@ -26,10 +27,12 @@ function isValidStatus(value: unknown): value is TaskStatus {
 export class TasksService {
   private taskModel: TaskModel;
   private emailService: EmailService;
+  private inboxService: InboxService;
 
   constructor() {
     this.taskModel = new TaskModel();
     this.emailService = new EmailService();
+    this.inboxService = new InboxService();
   }
 
   async createTask(data: CreateTaskRequest, userId: string): Promise<any> {
@@ -183,6 +186,18 @@ export class TasksService {
       console.warn("Skipping task assignment email for unverified user:", assignedUserEmail);
     }
 
+    // Create inbox notification for task assignment
+    try {
+      await this.inboxService.notifyTaskAssigned(
+        result.insertedId.toString(),
+        taskData.taskName,
+        assignedToUser,
+        userId
+      );
+    } catch (error) {
+      console.error("Failed to create inbox notification:", error);
+    }
+
     return {
       ok: true,
       insertedId: result.insertedId,
@@ -327,9 +342,27 @@ export class TasksService {
       throw new Error("Task not found or access denied");
     }
 
+    // Store previous status for notification
+    const previousStatus = task.status;
+
     // Update status
     task.status = status;
     await task.save();
+
+    // Create inbox notification for status change
+    try {
+      await this.inboxService.notifyTaskStatusChanged(
+        taskId,
+        task.taskName,
+        userId,
+        status,
+        previousStatus,
+        task.assignedTo?.toString(),
+        task.userId.toString()
+      );
+    } catch (error) {
+      console.error("Failed to create status change notification:", error);
+    }
 
     return { success: true, message: "Task status updated successfully", status };
   }
