@@ -6,11 +6,25 @@ import { initializeSocket } from "./infrastructure/socket.js";
 import { startCallMonitor } from "./services/callMonitor.service.js";
 import { startMaintenanceService } from "./services/maintenance.service.js";
 import { startSlackImportWorker } from "./workers/slackImport.worker.js";
+import { getRedisClient } from "./config/redis.js";
 
 // Connect to MongoDB
 connectDB()
-  .then(() => {
+  .then(async () => {
     console.log(`✅ Connected to MongoDB - Database: ${ENV.DB_NAME}`);
+
+    // Initialize Redis connection
+    console.log(`[Redis] Testing connection to Upstash...`);
+    const redisClient = getRedisClient();
+    
+    try {
+      const pongResult = await redisClient.ping();
+      if (pongResult === 'PONG') {
+        console.log('✅ Redis ping successful');
+      }
+    } catch (err) {
+      console.error('⚠️ Redis connection test failed:', (err as Error).message);
+    }
 
     const app = createApp();
     const httpServer = createServer(app);
