@@ -1,7 +1,7 @@
 "use client";
 
 import Sidebar from "../components/Sidebar";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { usePathname } from "next/navigation";
 
 export default function DashboardLayout({
@@ -40,7 +40,9 @@ export default function DashboardLayout({
 
   return (
     <div className="flex flex-col md:flex-row h-screen w-full bg-[var(--bg-canvas)] text-[13px] font-sans text-[var(--text-primary)] overflow-hidden">
-      <Sidebar userRole={userRole} />
+      <Suspense fallback={<div className="w-64 bg-[var(--bg-secondary)] overflow-hidden" />}>
+        <Sidebar userRole={userRole} />
+      </Suspense>
       <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-canvas)] relative overflow-hidden">
         {/* Main Content */}
         <main className="flex-1 overflow-hidden">
