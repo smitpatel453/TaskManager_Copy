@@ -42,9 +42,21 @@ function normalizeAttachments(attachments: Array<{ fileName?: string; url?: stri
 let io: SocketIOServer;
 
 export const initializeSocket = (httpServer: HttpServer) => {
+  console.log(`[Socket.IO] 🚀 Initializing Socket.IO server...`);
+  
   io = new SocketIOServer(httpServer, {
-    cors: CORS_CONFIG
+    cors: CORS_CONFIG,
+    // Enable all transports: WebSocket first (for traditional servers), polling fallback
+    transports: ['websocket', 'polling'],
+    // Polling configuration for serverless environments
+    pingInterval: 25000,
+    pingTimeout: 60000,
+    // Allow large buffers for message payloads
+    maxHttpBufferSize: 1e6,
   });
+
+  console.log(`[Socket.IO] ✅ Transports enabled: websocket, polling`);
+
 
   io.use(async (socket, next) => {
     try {
@@ -70,7 +82,10 @@ export const initializeSocket = (httpServer: HttpServer) => {
   });
 
   io.on('connection', (socket) => {
+    const transport = socket.conn.transport.name;
     console.log(`🔌 Client connected: ${socket.id}`);
+    console.log(`   📡 Transport: ${transport}`);
+    console.log(`   👤 User ID: ${socket.data.userId}`);
 
     const bootstrapRooms = async () => {
       try {
@@ -201,8 +216,11 @@ export const initializeSocket = (httpServer: HttpServer) => {
       }
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', (reason) => {
+      const transport = socket.conn?.transport?.name || 'unknown';
       console.log(`🔌 Client disconnected: ${socket.id}`);
+      console.log(`   📡 Last transport: ${transport}`);
+      console.log(`   📍 Disconnect reason: ${reason}`);
     });
   });
 

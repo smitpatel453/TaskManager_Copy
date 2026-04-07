@@ -30,29 +30,51 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
 
-            const newSocket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001', {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+            
+            // Detect if running on Vercel (serverless doesn't support WebSocket upgrades)
+            const isVercel = typeof window !== 'undefined' && 
+                (window.location.hostname.includes('vercel.app') || 
+                 window.location.hostname.includes('.in.'));
+            
+            console.log(`🌐 Environment: ${isVercel ? 'VERCEL (using polling)' : 'LOCAL/TRADITIONAL (using websocket → polling)'}`);
+            console.log(`📡 API URL: ${apiUrl}`);
+
+            // On Vercel, disable WebSocket since serverless doesn't support HTTP upgrades
+            // Use polling only for reliable connection
+            const transports = isVercel ? ['polling'] : ['websocket', 'polling'];
+            console.log(`📶 Socket.IO transports: ${transports.join(', ')}`);
+
+            const newSocket = io(apiUrl, {
                 auth: {
                     token,
                 },
                 reconnection: true,
                 reconnectionDelay: 1000,
                 reconnectionDelayMax: 5000,
-                reconnectionAttempts: 5,
-                transports: ['websocket', 'polling'],
+                reconnectionAttempts: Infinity,  // Keep retrying on Vercel
+                transports,
+                // Polling configuration
+                ...(isVercel && {
+                    pollingInterval: 3000,  // Poll every 3 seconds on Vercel
+                })
             });
 
             newSocket.on('connect', () => {
-                console.log('✅ Socket connected:', newSocket.id);
+                const transport = newSocket.io.engine.transport.name;
+                console.log(`✅ Socket connected: ${newSocket.id}`);
+                console.log(`📡 Connected via: ${transport}`);
                 setIsConnected(true);
             });
 
             newSocket.on('disconnect', (reason) => {
-                console.log('❌ Socket disconnected:', reason);
+                console.log(`❌ Socket disconnected - Reason: ${reason}`);
                 setIsConnected(false);
             });
 
             newSocket.on('reconnect', () => {
-                console.log('🔄 Socket reconnected');
+                const transport = newSocket.io.engine.transport.name;
+                console.log(`🔄 Socket reconnected via: ${transport}`);
                 setIsConnected(true);
 
                 // Auto-rejoin channels after reconnection
@@ -65,20 +87,23 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
                 }
             });
 
-            newSocket.on('reconnect_attempt', () => {
-                console.log('🔄 Attempting to reconnect...');
+            newSocket.on('reconnect_attempt', (attempt) => {
+                console.log(`🔄 Reconnection attempt #${attempt}...`);
             });
 
             newSocket.on('reconnect_error', (error) => {
-                console.error('⚠️ Reconnection error:', error);
+                console.error(`⚠️ Reconnection error:`, error?.message || error);
             });
 
             newSocket.on('reconnect_failed', () => {
-                console.error('❌ Failed to reconnect after max attempts');
+                console.error(`❌ Failed to reconnect - Check server status`);
             });
 
             newSocket.on('connect_error', (error) => {
-                console.error('⚠️ Socket connection error:', error);
+                console.error(`⚠️ Socket connection error:`, error?.message || error);
+                console.error(`   Message: ${error?.data?.message || 'Unknown error'}`);
+                const transport = newSocket.io.engine.transport.name;
+                console.error(`   Transport: ${transport}`);
             });
 
             // Track join_channel emissions for auto-rejoin on reconnect
