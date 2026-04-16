@@ -7,6 +7,9 @@ import rateLimit from 'express-rate-limit';
 export const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 100,
+    //
+    validate: { default: false }, // Add this
+    //
     message: {
         error: 'Too many requests from this IP, please try again later.',
     },
@@ -28,6 +31,9 @@ export const generalLimiter = rateLimit({
 export const startCallLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
     max: 10,
+    //
+    validate: { default: false }, // Add this
+    //
     keyGenerator: (req) => {
         // Use user ID if authenticated, otherwise fall back to IP with proper IPv6 handling
         const userId = (req as any).user?.userId;
@@ -46,6 +52,9 @@ export const startCallLimiter = rateLimit({
 export const joinCallLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
     max: 20,
+    //
+    validate: { default: false }, // Add this
+    //
     keyGenerator: (req) => {
         const userId = (req as any).user?.userId;
         return userId ? `join-call-${userId}` : `join-call-${req.ip}`;
@@ -63,6 +72,9 @@ export const joinCallLimiter = rateLimit({
 export const getCallInfoLimiter = rateLimit({
     windowMs: 60 * 1000, // 1 minute
     max: 60,
+    //
+    validate: { default: false }, // Add this
+    //
     keyGenerator: (req) => {
         const userId = (req as any).user?.userId;
         return userId ? `call-info-${userId}` : `call-info-${req.ip}`;
@@ -80,6 +92,9 @@ export const getCallInfoLimiter = rateLimit({
 export const enableRecordingLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
     max: 10,
+    //
+    validate: { default: false }, // Add this
+    //
     keyGenerator: (req) => {
         const userId = (req as any).user?.userId;
         return userId ? `recording-${userId}` : `recording-${req.ip}`;
@@ -97,6 +112,9 @@ export const enableRecordingLimiter = rateLimit({
 export const endCallLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
     max: 10,
+    //
+    validate: { default: false }, // Add this
+    //
     keyGenerator: (req) => {
         const userId = (req as any).user?.userId;
         return userId ? `end-call-${userId}` : `end-call-${req.ip}`;
