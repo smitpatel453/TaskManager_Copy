@@ -30,6 +30,9 @@ const authRateLimiter = rateLimit({
 
 export function createApp() {
   const app = express();
+  //
+  app.set('trust proxy', 1); // Add this here
+  //
   // Security headers
   app.use(helmet());
   // Middleware - CORS and body parser must come first
