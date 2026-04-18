@@ -5,7 +5,7 @@ export interface UserDocument extends Document {
     lastName: string;
     email: string;
     password: string;
-    role?: mongoose.Types.ObjectId;
+    role?: "admin" | "user";
     avatar?: string;
     emailVerified?: boolean;
     emailVerifiedAt?: Date;
@@ -23,7 +23,7 @@ const userSchema = new Schema<UserDocument>(
         lastName: { type: String, required: true },
         email: { type: String, required: true, unique: true, lowercase: true, trim: true },
         password: { type: String, required: true },
-        role: { type: Schema.Types.ObjectId, ref: "roles" },
+        role: { type: String, enum: ["admin", "user"], default: "user" },
         emailVerified: { type: Boolean, default: false },
         emailVerifiedAt: { type: Date },
         slackIntegration: {
