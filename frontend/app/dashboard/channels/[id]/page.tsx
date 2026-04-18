@@ -1059,6 +1059,7 @@ export default function ChannelPage() {
             <div className="py-4">
               {messageGroups.map((group, gi) => {
                 const firstMsg = group.messages[0];
+                const msgId = firstMsg._id ?? '';
                 const prevGroupLastMsg =
                   gi > 0
                     ? messageGroups[gi - 1].messages[messageGroups[gi - 1].messages.length - 1]
@@ -1073,7 +1074,7 @@ export default function ChannelPage() {
                     {showDiv && <DateDivider label={formatDateDivider(firstMsg.createdAt)} />}
 
                     {/* Message group */}
-                    <div id={`msg-${firstMsg._id}`} className={`flex px-3 sm:px-5 py-2 ${group.isMe ? "justify-end" : "justify-start"}`}>
+                    <div id={`msg-${msgId}`} className={`flex px-3 sm:px-5 py-2 ${group.isMe ? "justify-end" : "justify-start"}`}>
                       <div className={`flex gap-2 max-w-[85%] sm:max-w-[72%] ${group.isMe ? "flex-row-reverse" : "flex-row"}`}>
                         {/* Avatar */}
                         <div className="flex-shrink-0 mt-1">
@@ -1175,7 +1176,7 @@ export default function ChannelPage() {
 
                             {/* Message Actions Button */}
                             <button
-                              onClick={() => setActiveActionMenuId(activeActionMenuId === firstMsg._id ? null : firstMsg._id)}
+                              onClick={() => setActiveActionMenuId(activeActionMenuId === msgId ? null : msgId)}
                               className={`
                                 absolute ${group.isMe ? "right-full mr-2" : "left-full ml-2"}
                                 top-0 p-1.5 rounded-md
@@ -1189,29 +1190,30 @@ export default function ChannelPage() {
                             </button>
 
                             {/* Message Actions Menu */}
-                            {activeActionMenuId === firstMsg._id && (
+                            {activeActionMenuId === msgId && (
                               <div className={`absolute ${group.isMe ? "right-full mr-2" : "left-full ml-2"} top-0 z-30`}>
                                 <MessageActions
-                                  isOpen={activeActionMenuId === firstMsg._id}
-                                  onOpenReactions={() => setActiveReactionPickerId(firstMsg._id)}
+                                  isOpen={activeActionMenuId === msgId}
+                                  onOpenReactions={() => setActiveReactionPickerId(msgId)}
                                   onReply={() => {
                                     const replySenderName = `${firstMsg.sender?.firstName || 'User'} ${firstMsg.sender?.lastName || ''}`.trim();
                                     setReplyingTo({
-                                      _id: firstMsg._id!,
+                                      _id: msgId,
                                       senderName: replySenderName,
                                       messageText: firstMsg.text || '[Deleted or unavailable]'
                                     });
-                                    setReply(firstMsg._id!, replySenderName, firstMsg.text || '[Deleted or unavailable]');
+                                    setReply(msgId, replySenderName, firstMsg.text || '[Deleted or unavailable]');
                                     setActiveActionMenuId(null);
                                   }}
                                   onPin={() => {
-                                    const isPinned = pinnedMessages.has(firstMsg._id!);
+                                    const messageId = msgId;
+                                    const isPinned = pinnedMessages.has(messageId);
                                     setPinnedMessages(prev => {
                                       const next = new Set(prev);
-                                      if (next.has(firstMsg._id!)) {
-                                        next.delete(firstMsg._id!);
+                                      if (next.has(messageId)) {
+                                        next.delete(messageId);
                                       } else {
-                                        next.add(firstMsg._id!);
+                                        next.add(messageId);
                                       }
                                       return next;
                                     });
@@ -1221,18 +1223,18 @@ export default function ChannelPage() {
                                     setActiveActionMenuId(null);
                                   }}
                                   onClose={() => setActiveActionMenuId(null)}
-                                  isPinned={pinnedMessages.has(firstMsg._id!)}
+                                  isPinned={pinnedMessages.has(msgId)}
                                 />
                               </div>
                             )}
 
                             {/* Reaction Picker */}
-                            {activeReactionPickerId === firstMsg._id && (
+                            {activeReactionPickerId === msgId && (
                               <ReactionPicker
-                                isOpen={activeReactionPickerId === firstMsg._id}
+                                isOpen={activeReactionPickerId === msgId}
                                 position={group.isMe ? "left" : "right"}
                                 onSelect={(emoji) => {
-                                  handleEmojiReaction(firstMsg._id!, emoji, true);
+                                  handleEmojiReaction(msgId, emoji, true);
                                   // Close picker after selection
                                   setActiveReactionPickerId(null);
                                 }}
@@ -1250,18 +1252,18 @@ export default function ChannelPage() {
                     </div>
 
                     {/* Reaction Bar - Moved outside max-width container */}
-                    {messageReactions.get(firstMsg._id!)?.length > 0 && (
+                    {(messageReactions.get(msgId)?.length ?? 0) > 0 && (
                       <div className={`flex px-3 sm:px-5 w-full ${group.isMe ? "justify-end" : "justify-start"}`}>
                         <div className="relative flex flex-wrap gap-1 pointer-events-auto z-20">
                           <ReactionBar
-                            reactions={messageReactions.get(firstMsg._id!) || []}
+                            reactions={messageReactions.get(msgId) || []}
                             onReact={(emoji) => {
-                              handleEmojiReaction(firstMsg._id!, emoji, true);
+                              handleEmojiReaction(msgId, emoji, true);
                             }}
                             onRemoveReaction={(emoji) => {
-                              handleEmojiReaction(firstMsg._id!, emoji, false);
+                              handleEmojiReaction(msgId, emoji, false);
                             }}
-                            userReactions={messageReactions.get(firstMsg._id!)?.map(r => r.emoji) || []}
+                            userReactions={messageReactions.get(msgId)?.map(r => r.emoji) || []}
                           />
                         </div>
                       </div>
