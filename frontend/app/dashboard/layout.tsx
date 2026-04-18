@@ -10,7 +10,6 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-    // ...
   const [userRole, setUserRole] = useState<"admin" | "user" | undefined>();
   const hasInitialized = useRef(false);
   const pathname = usePathname();
@@ -34,6 +33,7 @@ export default function DashboardLayout({
         }
       } catch (error) {
         console.error("Error parsing user data:", error);
+        setUserRole("user");
       }
     } else {
       setUserRole("user");
@@ -44,7 +44,7 @@ export default function DashboardLayout({
     <CallProvider>
       <div className="flex flex-col md:flex-row h-screen w-full bg-[var(--bg-canvas)] text-[13px] font-sans text-[var(--text-primary)] overflow-hidden">
         <Suspense fallback={<div className="w-64 bg-[var(--sidebar-bg)] overflow-hidden" />}>
-          <Sidebar userRole={userRole} />
+          <Sidebar userRole={userRole || "user"} />
         </Suspense>
         <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-canvas)] relative overflow-hidden">
           {/* Main Content */}
