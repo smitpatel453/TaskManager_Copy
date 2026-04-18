@@ -21,21 +21,12 @@ export class ProjectsService {
     private async isUserAdmin(userId: string): Promise<boolean> {
         try {
             const user = await this.userModel.findById(userId);
-            if (!user || !user.role) {
+            if (!user) {
                 return false;
             }
 
-            const db = mongoose.connection.db;
-            if (!db) {
-                return false;
-            }
-
-            const adminRole = await db.collection("roles").findOne({ name: "admin" });
-            if (!adminRole) {
-                return false;
-            }
-
-            return user.role.toString() === adminRole._id.toString();
+            // Check if user role is "admin" (now stored as string in user schema)
+            return user.role === "admin";
         } catch (error) {
             console.error("Error checking admin status:", error);
             return false;

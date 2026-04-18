@@ -20,10 +20,8 @@ export class DashboardService {
       throw new Error("User not found");
     }
 
-    const rolesCollection = db.collection("roles");
-    const adminRole = await rolesCollection.findOne({ name: "admin" });
-    
-    if (!adminRole || !user.role || user.role.toString() !== adminRole._id.toString()) {
+    // Check admin role (now stored as string in user schema)
+    if (user.role !== "admin") {
       throw new Error("Access denied. Admin only.");
     }
 
