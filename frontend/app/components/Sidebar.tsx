@@ -227,7 +227,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
   const { data: teamUsersData, isLoading: teamUsersLoading } = useQuery({
     queryKey: ["users-dropdown"],
     queryFn: projectsApi.getAllUsersForDropdown,
-    enabled: isTeamModalOpen,
+    enabled: !!userRole,
     staleTime: 5 * 60 * 1000,
   });
   const teamUsers = teamUsersData?.data || [];
@@ -473,8 +473,14 @@ export default function Sidebar({ userRole }: SidebarProps) {
     ...(isAdmin ? [
       { id: "projects", label: "Projects", icon: "pi pi-folder", href: "/dashboard/projects" },
       { id: "users", label: "Users", icon: "pi pi-user", href: "/dashboard/users" },
-    ] : []),
+    ] : [
+      ...(projects.length > 0 ? [{ id: "projects", label: "Projects", icon: "pi pi-folder", href: "/dashboard/projects" }] : []),
+    ]),
   ];
+
+  const employeeNavItems = !isAdmin ? [
+    { id: "my-teams", label: "My Teams", icon: "pi pi-users", href: "/dashboard/teams" },
+  ] : [];
 
   /* ── Shared Sidebar Content ── */
   const SidebarContent = ({ onClose, isCollapsed }: { onClose?: () => void; isCollapsed?: boolean }) => (
@@ -514,24 +520,72 @@ export default function Sidebar({ userRole }: SidebarProps) {
           );
         })}
 
+        {/* Employee Nav Items (My Teams, Projects) */}
+        {employeeNavItems.map((item) => {
+          const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+          return (
+            <NavItem key={item.id} icon={item.icon} label={item.label} active={isActive} isCollapsed={isCollapsed}
+              onClick={() => { navigateTo(item.href); onClose?.(); }}
+            />
+          );
+        })}
+
         {/* Teams Section (Between Tasks and Inbox) */}
         {(teams.length > 0 || isAdmin) && (
           <div className="py-1">
             <SectionHeader label="Teams" onAdd={isAdmin ? openTeamModal : undefined} onToggle={() => setTeamsOpen(v => !v)} isOpen={teamsOpen} isCollapsed={isCollapsed} />
             {teamsOpen && !isCollapsed && (
               <div className="space-y-0.5 mt-1">
+                {/* All People */}
+                <NavItem 
+                  icon="pi pi-user" 
+                  label="All People" 
+                  badge={teamUsers.length || undefined}
+                  active={pathname === "/dashboard/teams/members"}
+                  onClick={() => { navigateTo("/dashboard/teams/members"); onClose?.(); }}
+                />
+                
+                {/* Analytics */}
+                <NavItem 
+                  icon="pi pi-chart-bar" 
+                  label="Analytics" 
+                  active={pathname === "/dashboard/teams"}
+                  onClick={() => { navigateTo("/dashboard/teams"); onClose?.(); }}
+                />
+
+                <div className="px-2.5 pt-3 pb-1">
+                  <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">My Teams</span>
+                </div>
+
+                {/* Team Search */}
+                <div className="px-1 mb-1">
+                  <div className="flex items-center gap-2 mx-1 px-2 py-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] focus-within:border-[var(--border-default)] transition-colors">
+                    <i className="pi pi-search text-[10px] text-[var(--text-muted)] flex-shrink-0" />
+                    <input
+                      type="text" 
+                      value={teamSearch}
+                      onChange={(e) => setTeamSearch(e.target.value)}
+                      placeholder="Search teams"
+                      className="no-focus-ring w-full bg-transparent border-0 outline-none text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+                    />
+                  </div>
+                </div>
+
+                {/* Team List */}
                 {teamsLoading ? <SkeletonSidebarItems count={2} /> : teamsToShow.map((team: any) => (
                   <NavItem key={team._id} icon="pi pi-users" label={team.teamName}
-                    active={pathname === "/dashboard/teams"}
-                    onClick={() => { navigateTo("/dashboard/teams"); onClose?.(); }}
+                    active={pathname.includes(`/dashboard/teams/${team._id}`)}
+                    onClick={() => { navigateTo(`/dashboard/teams/${team._id}`); onClose?.(); }}
                   />
                 ))}
+
                 {canToggleMoreTeams && (
                   <button onClick={() => setShowAllTeams(v => !v)}
                     className="w-full text-left px-2.5 py-1 text-[12px] text-[var(--accent)] hover:bg-[var(--nav-hover-bg)] rounded-lg">
                     {showAllTeams ? "Show less" : "More.."}
                   </button>
                 )}
+
                 {isAdmin && (
                   <button onClick={() => { openTeamModal(); onClose?.(); }}
                     className="w-full flex items-center gap-2.5 px-2.5 py-[7px] rounded-lg text-[13px] text-left text-[var(--text-muted)] hover:bg-[var(--nav-hover-bg)] hover:text-[var(--text-secondary)] transition-all">
@@ -716,11 +770,6 @@ export default function Sidebar({ userRole }: SidebarProps) {
                   className="w-full text-left px-3 py-2 text-[12px] text-[var(--text-secondary)] hover:bg-[var(--nav-hover-bg)] transition-colors flex items-center gap-2.5">
                   <i className="pi pi-cog text-[13px] text-[var(--text-muted)]" />
                   Settings
-                </button>
-                <button onClick={openPasswordModal}
-                  className="w-full text-left px-3 py-2 text-[12px] text-[var(--text-secondary)] hover:bg-[var(--nav-hover-bg)] transition-colors flex items-center gap-2.5">
-                  <i className="pi pi-shield text-[13px] text-[var(--text-muted)]" />
-                  Change Password
                 </button>
                 {isCollapsed && (
                   <button onClick={toggleTheme}

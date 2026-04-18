@@ -14,6 +14,12 @@ import {
 import { ChannelVideoCall } from "../../../components/videocalls/ChannelVideoCall";
 import { ChannelVoiceCall } from "../../../components/videocalls/ChannelVoiceCall";
 import { ChannelCallPrompt } from "../../../components/videocalls/ChannelCallPrompt";
+import { CallHistoryMessage } from "../../../components/chat/CallHistoryMessage";
+import { MessageActions } from "../../../components/chat/MessageActions";
+import { ReactionBar } from "../../../components/chat/ReactionBar";
+import { ReactionPicker } from "../../../components/chat/ReactionPicker";
+import { ReplyPreview } from "../../../components/chat/ReplyPreview";
+import { useMessageActions } from "../../../hooks/useMessageActions";
 import { videocallsApi } from "../../../../src/api/videocalls.api";
 import {
   HashtagIcon,
@@ -40,10 +46,16 @@ type Member = ChannelUser;
 interface Message extends Omit<ChannelMessage, "_id" | "channelId" | "createdAt" | "updatedAt" | "mentions" | "attachments"> {
   _id?: string;
   channelId?: string;
-  text: string;
+  text?: string;
   sender: Member | null;
   mentions?: Member[];
   attachments?: ChannelAttachment[];
+  replyTo?: {
+    messageId: string;
+    text: string;
+    senderName: string;
+    senderId: string;
+  } | null;
   createdAt: string | Date;
   local?: boolean; // optimistic
 }
@@ -279,6 +291,14 @@ export default function ChannelPage() {
   const [callStarted, setCallStarted] = useState(false);
   const [callData, setCallData] = useState<{ token: string; url: string; roomName: string; callId?: string } | null>(null);
 
+  // Message actions state
+  const { setReply, clearReply, getReplyTo } = useMessageActions();
+  const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null);
+  const [activeReactionPickerId, setActiveReactionPickerId] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{ _id: string; senderName: string; messageText: string } | null>(null);
+  const [messageReactions, setMessageReactions] = useState<Map<string, { emoji: string; count: number }[]>>(new Map());
+  const [pinnedMessages, setPinnedMessages] = useState<Set<string>>(new Set());
+
   // Auto-open the call UI when navigated from the global incoming call banner (?openCall=1)
   useEffect(() => {
     const openCall = searchParams.get('openCall');
@@ -295,6 +315,53 @@ export default function ChannelPage() {
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const memberSearchRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recentEmojiUpdatesRef = useRef<Map<string, number>>(new Map());
+  
+  // Helper function to safely update emoji reactions
+  const handleEmojiReaction = useCallback((messageId: string, emoji: string, add: boolean) => {
+    const updateKey = `${messageId}-${emoji}`;
+    const now = Date.now();
+    const lastUpdate = recentEmojiUpdatesRef.current.get(updateKey);
+    
+    // Block duplicate updates within 150ms window
+    if (lastUpdate && now - lastUpdate < 150) {
+      return;
+    }
+    
+    recentEmojiUpdatesRef.current.set(updateKey, now);
+    
+    setMessageReactions(prev => {
+      const next = new Map(prev);
+      let reactions = next.get(messageId) ? [...next.get(messageId)!] : [];
+      
+      if (add) {
+        const existingIndex = reactions.findIndex(r => r.emoji === emoji);
+        if (existingIndex >= 0) {
+          // Create new object to ensure React detects change
+          reactions[existingIndex] = {
+            emoji: reactions[existingIndex].emoji,
+            count: reactions[existingIndex].count + 1
+          };
+        } else {
+          reactions.push({ emoji, count: 1 });
+        }
+      } else {
+        reactions = reactions.map(r => 
+          r.emoji === emoji 
+            ? { emoji: r.emoji, count: Math.max(0, r.count - 1) }
+            : r
+        ).filter(r => r.count > 0);
+      }
+      
+      if (reactions.length === 0) {
+        next.delete(messageId);
+      } else {
+        next.set(messageId, reactions);
+      }
+      return next;
+    });
+  }, []);
+  
   const { toasts, add: addToast, remove: removeToast } = useToast();
 
   const quickEmojis = ["😀", "😂", "😍", "🔥", "👍", "🎉", "✅", "🙏", "👀", "🤝", "❤️", "🚀"];
@@ -419,7 +486,38 @@ export default function ChannelPage() {
         });
       });
 
-
+      // Fetch fresh messages when call ends to show call history
+      socket.on("channel:call-ended", async (data: { callId?: string; channelId: string; duration?: number; callType?: 'voice' | 'video'; status?: 'completed' | 'missed' | 'declined'; initiatorId?: string; participants?: string[] }) => {
+        if (data.channelId === normalizedChannelId) {
+          try {
+            // Add call message directly
+            if (data.callType && data.status) {
+              const callMessage = await channelsApi.logCall(normalizedChannelId, {
+                callType: data.callType,
+                status: data.status,
+                duration: data.duration || 0,
+                participants: data.participants,
+                initiatorId: data.initiatorId
+              });
+              setMessages((prev) => [...prev, callMessage as Message]);
+            } else {
+              // Fallback: refresh all messages if call data incomplete
+              const history = await channelsApi.getMessages(normalizedChannelId);
+              setMessages(history as Message[]);
+            }
+            console.log('Call ended, message added to chat');
+          } catch (err) {
+            console.error('Failed to add call message:', err);
+            // Fallback to refreshing messages
+            try {
+              const history = await channelsApi.getMessages(normalizedChannelId);
+              setMessages(history as Message[]);
+            } catch (e) {
+              console.error('Failed to refresh messages:', e);
+            }
+          }
+        }
+      });
 
       socket.on("channel_presence_updated", handlePresenceUpdated);
 
@@ -446,6 +544,7 @@ export default function ChannelPage() {
       mounted = false;
       if (socket) {
         socket.off("receive_message");
+        socket.off("channel:call-ended");
         socket.off("channel_presence_updated", handlePresenceUpdated);
         socket.off("user_typing_start");
         socket.off("user_typing_stop");
@@ -472,12 +571,18 @@ export default function ChannelPage() {
       return text.toLowerCase().includes(`@${mentionedUser.firstName.toLowerCase()}`);
     });
 
-    // Optimistic message
+    // Optimistic message with replyTo included
     const optimistic: Message = {
       text,
       sender: currentUser,
       attachments: pendingAttachments,
       mentions: mentionSuggestions.filter((member) => mentionIds.includes(member._id)),
+      replyTo: replyingTo ? {
+        messageId: replyingTo._id || '',
+        text: replyingTo.messageText || '',
+        senderName: replyingTo.senderName || '',
+        senderId: replyingTo._id || ''
+      } : null,
       createdAt: new Date().toISOString(),
       local: true,
     };
@@ -486,16 +591,24 @@ export default function ChannelPage() {
     setSelectedMentionIds([]);
     setPendingAttachments([]);
     setMentionVisible(false);
+    setReplyingTo(null); // Clear reply after sending
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
 
+    // Emit with replyTo data
     socket.emit("send_message", {
       channelId: normalizedChannelId,
       text,
       senderId: currentUser._id,
       mentions: mentionIds,
       attachments: pendingAttachments,
+      replyTo: replyingTo ? {
+        messageId: replyingTo._id,
+        text: replyingTo.messageText || '',
+        senderName: replyingTo.senderName,
+        senderId: currentUser._id
+      } : null,
     });
 
     // Stop typing indicator on send
@@ -770,6 +883,62 @@ export default function ChannelPage() {
           </div>
         </header>
 
+        {/* Pinned Messages Bar */}
+        {pinnedMessages.size > 0 && (
+          <div className="flex-none bg-[var(--bg-surface)] border-b border-[var(--border-subtle)] px-4 py-2 overflow-x-auto ck-scrollbar-h">
+            <div className="flex gap-2">
+              {Array.from(pinnedMessages).map((pinnedId) => {
+                const pinnedMsg = messages.find(m => m._id === pinnedId);
+                if (!pinnedMsg) return null;
+                
+                const senderName = pinnedMsg.sender 
+                  ? `${pinnedMsg.sender.firstName} ${pinnedMsg.sender.lastName}`
+                  : "Unknown";
+                
+                return (
+                  <div
+                    key={pinnedId}
+                    className="flex-shrink-0 flex items-center gap-2 bg-[var(--bg-surface-2)] border border-[var(--border-default)] rounded-lg px-3 py-1.5 cursor-pointer hover:bg-[var(--bg-surface-3)] transition-colors group"
+                    onClick={() => {
+                      const element = document.getElementById(`msg-${pinnedId}`);
+                      if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        element.classList.add('highlight-pulse');
+                        setTimeout(() => element.classList.remove('highlight-pulse'), 2000);
+                      }
+                    }}
+                  >
+                    <svg className="w-3.5 h-3.5 flex-shrink-0 text-[var(--ck-blue)]" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-semibold text-[var(--text-secondary)]">{senderName}</p>
+                      <p className="text-[12px] text-[var(--text-tertiary)] truncate">{pinnedMsg.text || '[Message]'}</p>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPinnedMessages(prev => {
+                          const next = new Set(prev);
+                          next.delete(pinnedId);
+                          return next;
+                        });
+                        addToast("Message unpinned", "info", 2000);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                      title="Unpin"
+                    >
+                      <svg className="w-4 h-4 text-[var(--text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
 
 
         {/* Call section (Voice or Video) */}
@@ -805,6 +974,7 @@ export default function ChannelPage() {
                     url={callData.url}
                     roomName={callData.roomName}
                     callId={callData.callId}
+                    currentUser={currentUser}
                   />
                 )}
               </div>
@@ -903,7 +1073,7 @@ export default function ChannelPage() {
                     {showDiv && <DateDivider label={formatDateDivider(firstMsg.createdAt)} />}
 
                     {/* Message group */}
-                    <div className={`flex px-3 sm:px-5 py-2 ${group.isMe ? "justify-end" : "justify-start"}`}>
+                    <div id={`msg-${firstMsg._id}`} className={`flex px-3 sm:px-5 py-2 ${group.isMe ? "justify-end" : "justify-start"}`}>
                       <div className={`flex gap-2 max-w-[85%] sm:max-w-[72%] ${group.isMe ? "flex-row-reverse" : "flex-row"}`}>
                         {/* Avatar */}
                         <div className="flex-shrink-0 mt-1">
@@ -916,42 +1086,79 @@ export default function ChannelPage() {
                           )}
                         </div>
 
-                        {/* Message bubble */}
-                        <div className={`flex flex-col ${group.isMe ? "items-end" : "items-start"}`}>
+                        {/* Message bubble with actions */}
+                        <div className={`flex flex-col ${group.isMe ? "items-end" : "items-start"} relative group`}>
                           {!group.isMe && (
                             <span className="text-[12px] font-semibold text-[var(--text-primary)] px-3 mb-0.5">
                               {senderName}
                             </span>
                           )}
 
-                          <div className={`rounded-2xl px-4 py-2 ${group.isMe
-                            ? "bg-[var(--bg-surface)] text-[var(--text-primary)] rounded-br-sm border border-[var(--border-subtle)] shadow-sm"
-                            : "bg-[var(--bg-surface-2)] text-[var(--text-primary)] rounded-bl-sm border border-[var(--border-subtle)]"
-                            }`}>
-                            <div className="space-y-1">
-                              {group.messages.map((msg, mi) => (
-                                <div key={mi} className={`${msg.local ? "opacity-60" : ""}`}>
-                                  {msg.text && (
-                                    <p className="text-[14px] leading-relaxed break-words">
-                                      {renderMessageText(msg.text)}
-                                    </p>
-                                  )}
+                          <div className="relative">
+                            <div className={`rounded-2xl px-4 py-2 ${group.isMe
+                              ? "bg-[var(--bg-surface)] text-[var(--text-primary)] rounded-br-sm border border-[var(--border-subtle)] shadow-sm"
+                              : "bg-[var(--bg-surface-2)] text-[var(--text-primary)] rounded-bl-sm border border-[var(--border-subtle)]"
+                              }`}>
+                              <div className="space-y-1">
+                                {group.messages.map((msg, mi) => (
+                                  <div key={mi} className={`${msg.local ? "opacity-60" : ""}`}>
+                                    {/* Reply Context */}
+                                    {msg.replyTo && (
+                                      <div className={`mb-2 p-2 rounded border-l-4 ${group.isMe
+                                        ? "bg-[var(--bg-surface-3)] border-[var(--text-secondary)]"
+                                        : "bg-white border-[var(--ck-blue)]"
+                                        }`}>
+                                        <p className="text-[10px] font-bold text-[var(--ck-blue)] mb-0.5 uppercase tracking-wide">
+                                          ↳ Replied to
+                                        </p>
+                                        <p className="text-[11px] font-semibold text-[var(--text-primary)] leading-tight">
+                                          {msg.replyTo.senderName}
+                                        </p>
+                                        <p className="text-[11px] text-[var(--text-tertiary)] truncate leading-snug mt-0.5">
+                                          {msg.replyTo.text || '[Deleted or unavailable]'}
+                                        </p>
+                                      </div>
+                                    )}
 
-                                  {!!msg.attachments?.length && (
-                                    <div className="mt-3 flex flex-wrap gap-2">
-                                      {msg.attachments.map((file, fileIndex) => {
-                                        const isPdf = file.fileName?.toLowerCase().endsWith('.pdf');
-                                        return (
-                                          <a
-                                            key={`${file.url}-${fileIndex}`}
-                                            href={file.url}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className={`flex items-center gap-3 w-[280px] rounded-lg p-2.5 shadow-sm transition-all group no-underline ${group.isMe
-                                              ? "bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-2)] border border-[var(--border-subtle)]"
-                                              : "bg-[var(--bg-surface-2)] hover:bg-[var(--bg-surface-3)] border border-[var(--border-subtle)]"
-                                              }`}
-                                          >
+                                    {/* Call history message */}
+                                    {(msg as any).messageType === 'call' && (msg as any).callHistory ? (
+                                      <CallHistoryMessage 
+                                        data={{
+                                          type: (msg as any).callHistory.type,
+                                          duration: (msg as any).callHistory.duration,
+                                          participants: (msg as any).callHistory.participants || [],
+                                          initiatorId: (msg as any).callHistory.initiatorId,
+                                          status: (msg as any).callHistory.status,
+                                        }}
+                                        sender={{
+                                          _id: msg.sender?._id || 'unknown',
+                                          firstName: msg.sender?.firstName || 'Unknown',
+                                          lastName: msg.sender?.lastName || 'User',
+                                        }}
+                                        createdAt={msg.createdAt}
+                                        isOwn={msg.sender?._id === currentUser?._id}
+                                      />
+                                    ) : msg.text ? (
+                                      <p className="text-[14px] leading-relaxed break-words">
+                                        {renderMessageText(msg.text)}
+                                      </p>
+                                    ) : null}
+
+                                    {!!msg.attachments?.length && (
+                                      <div className="mt-3 flex flex-wrap gap-2">
+                                        {msg.attachments.map((file, fileIndex) => {
+                                          const isPdf = file.fileName?.toLowerCase().endsWith('.pdf');
+                                          return (
+                                            <a
+                                              key={`${file.url}-${fileIndex}`}
+                                              href={file.url}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className={`flex items-center gap-3 w-[280px] rounded-lg p-2.5 shadow-sm transition-all group no-underline ${group.isMe
+                                                ? "bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-2)] border border-[var(--border-subtle)]"
+                                                : "bg-[var(--bg-surface-2)] hover:bg-[var(--bg-surface-3)] border border-[var(--border-subtle)]"
+                                                }`}
+                                            >
                                             {/* Document Icon */}
                                             <div className="relative flex-shrink-0 transition-transform">
                                               <img src="/doc-icon.png" alt="Document" className="w-10 h-10 object-contain" />
@@ -983,6 +1190,74 @@ export default function ChannelPage() {
                             </div>
                           </div>
 
+                            {/* Message Actions Button */}
+                            <button
+                              onClick={() => setActiveActionMenuId(activeActionMenuId === firstMsg._id ? null : firstMsg._id)}
+                              className={`
+                                absolute ${group.isMe ? "right-full mr-2" : "left-full ml-2"}
+                                top-0 p-1.5 rounded-md
+                                opacity-0 group-hover:opacity-100 transition-opacity duration-200
+                                hover:bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]
+                                focus:outline-none focus:ring-2 focus:ring-[var(--ck-blue)]
+                              `}
+                              title="Message actions"
+                            >
+                              <EllipsisVerticalIcon className="w-4 h-4" />
+                            </button>
+
+                            {/* Message Actions Menu */}
+                            {activeActionMenuId === firstMsg._id && (
+                              <div className={`absolute ${group.isMe ? "right-full mr-2" : "left-full ml-2"} top-0 z-30`}>
+                                <MessageActions
+                                  isOpen={activeActionMenuId === firstMsg._id}
+                                  onOpenReactions={() => setActiveReactionPickerId(firstMsg._id)}
+                                  onReply={() => {
+                                    const replySenderName = `${firstMsg.sender?.firstName || 'User'} ${firstMsg.sender?.lastName || ''}`.trim();
+                                    setReplyingTo({
+                                      _id: firstMsg._id!,
+                                      senderName: replySenderName,
+                                      messageText: firstMsg.text || '[Deleted or unavailable]'
+                                    });
+                                    setReply(firstMsg._id!, replySenderName, firstMsg.text || '[Deleted or unavailable]');
+                                    setActiveActionMenuId(null);
+                                  }}
+                                  onPin={() => {
+                                    const isPinned = pinnedMessages.has(firstMsg._id!);
+                                    setPinnedMessages(prev => {
+                                      const next = new Set(prev);
+                                      if (next.has(firstMsg._id!)) {
+                                        next.delete(firstMsg._id!);
+                                      } else {
+                                        next.add(firstMsg._id!);
+                                      }
+                                      return next;
+                                    });
+                                    setTimeout(() => {
+                                      addToast(isPinned ? "Message unpinned" : "Message pinned", isPinned ? "info" : "success", 2000);
+                                    }, 0);
+                                    setActiveActionMenuId(null);
+                                  }}
+                                  onClose={() => setActiveActionMenuId(null)}
+                                  isPinned={pinnedMessages.has(firstMsg._id!)}
+                                />
+                              </div>
+                            )}
+
+                            {/* Reaction Picker */}
+                            {activeReactionPickerId === firstMsg._id && (
+                              <ReactionPicker
+                                isOpen={activeReactionPickerId === firstMsg._id}
+                                position={group.isMe ? "left" : "right"}
+                                onSelect={(emoji) => {
+                                  handleEmojiReaction(firstMsg._id!, emoji, true);
+                                  // Close picker after selection
+                                  setActiveReactionPickerId(null);
+                                }}
+                                onClose={() => setActiveReactionPickerId(null)}
+                              />
+                            )}
+                          </div>
+
                           {/* Time stamp */}
                           <span className={`text-[11px] mt-1 ${group.isMe ? "text-[var(--text-tertiary)]" : "text-[var(--text-secondary)]"}`}>
                             {formatRelativeTime(firstMsg.createdAt)}
@@ -990,6 +1265,24 @@ export default function ChannelPage() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Reaction Bar - Moved outside max-width container */}
+                    {messageReactions.get(firstMsg._id!)?.length > 0 && (
+                      <div className={`flex px-3 sm:px-5 w-full ${group.isMe ? "justify-end" : "justify-start"}`}>
+                        <div className="relative flex flex-wrap gap-1 pointer-events-auto z-20">
+                          <ReactionBar
+                            reactions={messageReactions.get(firstMsg._id!) || []}
+                            onReact={(emoji) => {
+                              handleEmojiReaction(firstMsg._id!, emoji, true);
+                            }}
+                            onRemoveReaction={(emoji) => {
+                              handleEmojiReaction(firstMsg._id!, emoji, false);
+                            }}
+                            userReactions={messageReactions.get(firstMsg._id!)?.map(r => r.emoji) || []}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -997,6 +1290,20 @@ export default function ChannelPage() {
             </div>
           )}
         </div>
+
+        {/* Reply Preview */}
+        {replyingTo && (
+          <div className="px-3 sm:px-6 pt-2">
+            <ReplyPreview
+              senderName={replyingTo.senderName}
+              messageText={replyingTo.messageText}
+              onCancel={() => {
+                setReplyingTo(null);
+                clearReply();
+              }}
+            />
+          </div>
+        )}
 
         {/* Typing Indicator */}
         {typingUsers.size > 0 && !showVideoCall && (
@@ -1436,6 +1743,24 @@ export default function ChannelPage() {
           </div>
         </div>
       )}
+
+      {/* Highlight animation for pinned messages */}
+      <style>{`
+        @keyframes highlight-pulse {
+          0% {
+            background-color: transparent;
+          }
+          50% {
+            background-color: rgba(59, 130, 246, 0.1);
+          }
+          100% {
+            background-color: transparent;
+          }
+        }
+        .highlight-pulse {
+          animation: highlight-pulse 2s ease-in-out;
+        }
+      `}</style>
 
       {/* Toasts */}
       <ToastContainer toasts={toasts} remove={removeToast} />

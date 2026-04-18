@@ -2,10 +2,6 @@
 @import "lineicons/dist/lineicons.css";
 @import "primereact/resources/primereact.min.css";
 @import "primeicons/primeicons.css";
-/* @import "tw-animate-css"; */
-/* @import "shadcn/tailwind.css"; */
-
-/* @custom-variant dark (&:is(.dark *)); */
 
 /* ── Design System — Reference-matched palette ── */
 :root {
@@ -518,6 +514,25 @@ select:-webkit-autofill:focus {
   background-color: #CBD5E1;
 }
 
+/* Horizontal scrollbar for pinned messages */
+.ck-scrollbar-h::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.ck-scrollbar-h::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ck-scrollbar-h::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 10px;
+}
+
+.ck-scrollbar-h:hover::-webkit-scrollbar-thumb {
+  background-color: #CBD5E1;
+}
+
 /* Hide scrollbar completely */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
@@ -716,8 +731,296 @@ select:-webkit-autofill:focus {
   color: var(--text-primary) !important;
 }
 
+.p-dropdown {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border-subtle) !important;
+  color: var(--text-primary) !important;
+  border-radius: 0.625rem !important;
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+}
+
+.p-dropdown:hover {
+  border-color: var(--border-default) !important;
+}
+
+.p-dropdown:focus {
+  outline: none !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 0.2rem rgba(79, 70, 229, 0.25) !important;
+}
+
+.p-dropdown .p-dropdown-label {
+  color: var(--text-primary) !important;
+  font-size: 13px !important;
+  padding: 0.5rem 0.75rem !important;
+  display: flex !important;
+  align-items: center !important;
+  flex: 1 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.p-dropdown .p-placeholder {
+  color: var(--text-muted) !important;
+  padding: 0.5rem 0.75rem !important;
+  display: inline-block !important;
+}
+
+.p-dropdown-trigger {
+  background-color: transparent !important;
+  color: var(--text-secondary) !important;
+  padding: 0.5rem 0.75rem !important;
+  flex-shrink: 0 !important;
+}
+
+.p-dropdown-label-container {
+  flex: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 !important;
+}
+
 .dark .p-dropdown-panel {
   background: var(--bg-surface) !important;
   border-color: var(--border-subtle) !important;
   color: var(--text-primary) !important;
+}
+
+.p-dropdown-panel {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: 0.625rem !important;
+}
+
+.p-dropdown-items {
+  background: var(--bg-surface) !important;
+}
+
+.p-dropdown-item {
+  color: var(--text-primary) !important;
+  padding: 0.75rem 1rem !important;
+}
+
+.p-dropdown-item:hover {
+  background-color: var(--bg-canvas) !important;
+  color: var(--text-primary) !important;
+}
+
+.p-dropdown-item.p-highlight {
+  background-color: rgba(79, 70, 229, 0.15) !important;
+  color: var(--accent) !important;
+  font-weight: 500 !important;
+}
+
+.dark .p-dropdown-item:hover {
+  background-color: var(--bg-canvas) !important;
+}
+
+.dark .p-dropdown-item.p-highlight {
+  background-color: rgba(99, 102, 241, 0.2) !important;
+}
+
+/* Ensure dropdown label text is visible */
+.p-dropdown .p-dropdown-label {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+}
+
+.p-dropdown-items .p-dropdown-item {
+  overflow: visible !important;
+  white-space: normal !important;
+  word-wrap: break-word !important;
+}
+
+/* Fix for text overlap in dropdown */
+.p-dropdown-trigger {
+  padding: 0.5rem 0.75rem !important;
+}
+
+.p-dropdown .p-dropdown-label-container {
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.p-dropdown-item:focus {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: -2px !important;
+}
+
+/* Ensure dropdown items are properly styled */
+.p-dropdown-items {
+  padding: 0.5rem 0 !important;
+}
+
+.p-dropdown-item {
+  margin: 0 !important;
+  border-radius: 0.375rem !important;
+}
+
+/* Dropdown wrapper alignment */
+.p-dropdown-empty-message {
+  padding: 0.75rem 1rem !important;
+  color: var(--text-muted) !important;
+}
+
+/* Ensure baseline alignment for all dropdown inner elements */
+.p-dropdown {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+}
+
+/* Apply consistent styling to all text within dropdown */
+.p-dropdown .p-dropdown-label,
+.p-dropdown .p-placeholder {
+  line-height: 1.5rem !important;
+  vertical-align: middle !important;
+  margin: 0 !important;
+}
+
+/* Ensure trigger button matches drop height */
+.p-dropdown-trigger {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Ensure label proper alignment in the box */
+.p-dropdown .p-dropdown-label {
+  width: 100% !important;
+  max-width: calc(100% - 2rem) !important;
+}
+
+/* Properly center and align placeholder text */
+.p-dropdown {
+  min-height: 2.5rem !important;
+  padding: 0 !important;
+}
+
+.p-dropdown .p-dropdown-items-wrapper {
+  max-height: 200px !important;
+}
+
+/* Dropdown label empty (placeholder) alignment */
+.p-dropdown-label-empty {
+  padding: 0.5rem 0.75rem !important;
+  color: var(--text-muted) !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Dropdown selected label alignment */
+.p-dropdown-label {
+  padding: 0.5rem 0.75rem !important;
+  display: flex !important;
+  align-items: center !important;
+  min-height: 2.5rem !important;
+}
+
+/* Trigger icon alignment */
+.p-dropdown-trigger {
+  right: 0.75rem !important;
+}
+
+/* Dropdown wrapper for proper sizing */
+.p-dropdown-items-wrapper .p-dropdown-items {
+  padding: 0.25rem 0 !important;
+  max-height: 200px !important;
+  overflow-y: auto !important;
+}
+
+/* ─── Accessibility Features ─────────────────────────── */
+
+/* Reduced Motion Mode */
+.reduced-motion * {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+.reduced-motion {
+  scroll-behavior: auto !important;
+}
+
+/* Remove animations from specific elements in reduced motion mode */
+.reduced-motion .animate-fade-in,
+.reduced-motion .animate-slide-up,
+.reduced-motion .animate-scale-up,
+.reduced-motion [class*="animate-"],
+.reduced-motion [class*="transition-"] {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Temporarily disable transitions during reduced motion */
+.reduced-motion *::after,
+.reduced-motion *::before {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* High Contrast Mode */
+.high-contrast {
+  --text-primary: #000000;
+  --text-secondary: #111827;
+  --text-muted: #333333;
+  --bg-canvas: #FFFFFF;
+  --bg-surface: #F5F5F5;
+  --border-subtle: #000000;
+  --border-default: #000000;
+  --accent: #0000FF;
+  --accent-hover: #000080;
+}
+
+.high-contrast.dark {
+  --text-primary: #FFFFFF;
+  --text-secondary: #F0F0F0;
+  --text-muted: #CCCCCC;
+  --bg-canvas: #000000;
+  --bg-surface: #1A1A1A;
+  --border-subtle: #FFFFFF;
+  --border-default: #FFFFFF;
+  --accent: #FFFF00;
+  --accent-hover: #CCCC00;
+}
+
+.high-contrast,
+.high-contrast * {
+  border-width: 2px !important;
+}
+
+.high-contrast button,
+.high-contrast [role="button"],
+.high-contrast input,
+.high-contrast select,
+.high-contrast textarea {
+  border: 2px solid var(--border-default) !important;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.high-contrast button:focus,
+.high-contrast [role="button"]:focus,
+.high-contrast input:focus,
+.high-contrast select:focus,
+.high-contrast textarea:focus {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 3px !important;
+}
+
+.high-contrast a {
+  text-decoration: underline !important;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.high-contrast a:focus {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 3px !important;
 }

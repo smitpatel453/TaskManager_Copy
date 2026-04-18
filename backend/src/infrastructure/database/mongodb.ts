@@ -23,6 +23,7 @@ async function connectDB() {
     const opts = {
       bufferCommands: false,
       dbName: ENV.DB_NAME,
+      serverSelectionTimeoutMS: 5000, // Fail fast after 5 seconds
     };
 
     cached.promise = mongoose.connect(uri!, opts);

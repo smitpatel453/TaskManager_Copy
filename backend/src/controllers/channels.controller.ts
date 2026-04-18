@@ -38,6 +38,12 @@ type CreateChannelMessageBody = {
     mimeType?: string;
     size?: number;
   }>;
+  replyTo?: {
+    messageId?: string;
+    text?: string;
+    senderName?: string;
+    senderId?: string;
+  };
 };
 
 const DEFAULT_CHANNELS = [
@@ -122,6 +128,12 @@ function toMessagePayload(message: any) {
       : null,
     mentions: mapChannelUsers(message.mentions),
     attachments: Array.isArray(message.attachments) ? message.attachments : [],
+    replyTo: message.replyTo ? {
+      messageId: message.replyTo.messageId?.toString?.() || '',
+      text: message.replyTo.text || '',
+      senderName: message.replyTo.senderName || '',
+      senderId: message.replyTo.senderId?.toString?.() || ''
+    } : null,
     createdAt: message.createdAt,
     updatedAt: message.updatedAt,
   };
@@ -447,12 +459,26 @@ export const createChannelMessage = async (req: Request, res: Response) => {
       return;
     }
 
+    // Handle replyTo field
+    let replyTo = undefined;
+    if (body.replyTo?.messageId && mongoose.Types.ObjectId.isValid(body.replyTo.messageId)) {
+      replyTo = {
+        messageId: new mongoose.Types.ObjectId(body.replyTo.messageId),
+        text: body.replyTo.text || '',
+        senderName: body.replyTo.senderName || 'Unknown',
+        senderId: body.replyTo.senderId && mongoose.Types.ObjectId.isValid(body.replyTo.senderId)
+          ? new mongoose.Types.ObjectId(body.replyTo.senderId)
+          : new mongoose.Types.ObjectId(userId)
+      };
+    }
+
     const message = await ChannelMessageModel.create({
       channelId,
       text,
       sender: new mongoose.Types.ObjectId(userId),
       mentions,
       attachments,
+      replyTo: replyTo || null,
     });
 
     const hydrated = await ChannelMessageModel.findById(message._id)
@@ -517,6 +543,71 @@ export const uploadChannelFiles = async (req: Request, res: Response) => {
   }
 };
 
+export const logChannelCall = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const { channelId } = req.params;
+    const channel = await ChannelModel.findOne({ channelId }).lean() as ChannelLean | null;
+    if (!channel) {
+      res.status(404).json({ error: 'Channel not found' });
+      return;
+    }
+
+    if (!canAccessChannel(channel, userId) || !hasJoinedChannel(channel, userId)) {
+      res.status(403).json({ error: 'Join channel first' });
+      return;
+    }
+
+    const body = req.body as {
+      callType?: 'voice' | 'video';
+      status?: 'completed' | 'missed' | 'declined';
+      duration?: number;
+      participants?: string[];
+      initiatorId?: string;
+    };
+
+    if (!body.callType || !body.status) {
+      res.status(400).json({ error: 'Missing callType or status' });
+      return;
+    }
+
+    const callMessage = await ChannelMessageModel.create({
+      channelId,
+      text: '',
+      sender: new mongoose.Types.ObjectId(userId),
+      mentions: [],
+      attachments: [],
+      messageType: 'call',
+      isSystemMessage: false,
+      callHistory: {
+        type: body.callType,
+        status: body.status,
+        duration: body.duration || 0,
+        initiatorId: new mongoose.Types.ObjectId(body.initiatorId || userId),
+        participants: (body.participants || []).map(id => ({
+          _id: new mongoose.Types.ObjectId(id),
+          firstName: 'User',
+          lastName: ''
+        }))
+      }
+    });
+
+    const hydrated = await ChannelMessageModel.findById(callMessage._id)
+      .populate('sender', 'firstName lastName email')
+      .populate('callHistory.participants', 'firstName lastName');
+
+    res.status(201).json(toMessagePayload(hydrated));
+  } catch (error) {
+    console.error('Error logging call:', error);
+    res.status(500).json({ error: 'Failed to log call' });
+  }
+};
+
 export const getChannelMentionSuggestions = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.userId;
@@ -567,5 +658,142 @@ export const getChannelUsers = async (_req: Request, res: Response) => {
   } catch (error) {
     console.error('Error fetching users for channels:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
+  }
+};
+
+export const starMessage = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const { channelId, messageId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      res.status(400).json({ error: 'Invalid message ID' });
+      return;
+    }
+
+    const channel = await ChannelModel.findOne({ channelId }).lean() as ChannelLean | null;
+    if (!channel) {
+      res.status(404).json({ error: 'Channel not found' });
+      return;
+    }
+
+    if (!canAccessChannel(channel, userId) || !hasJoinedChannel(channel, userId)) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    const message = await ChannelMessageModel.findById(messageId);
+    if (!message) {
+      res.status(404).json({ error: 'Message not found' });
+      return;
+    }
+
+    message.isStarred = !message.isStarred;
+    await message.save();
+
+    const hydrated = await ChannelMessageModel.findById(message._id)
+      .populate('sender', 'firstName lastName email')
+      .populate('mentions', 'firstName lastName email');
+
+    res.status(200).json(toMessagePayload(hydrated));
+  } catch (error) {
+    console.error('Error starring message:', error);
+    res.status(500).json({ error: 'Failed to star message' });
+  }
+};
+
+export const pinMessage = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const { channelId, messageId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      res.status(400).json({ error: 'Invalid message ID' });
+      return;
+    }
+
+    const channel = await ChannelModel.findOne({ channelId }).lean() as ChannelLean | null;
+    if (!channel) {
+      res.status(404).json({ error: 'Channel not found' });
+      return;
+    }
+
+    if (!canAccessChannel(channel, userId) || !hasJoinedChannel(channel, userId)) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    const message = await ChannelMessageModel.findById(messageId);
+    if (!message) {
+      res.status(404).json({ error: 'Message not found' });
+      return;
+    }
+
+    message.isPinned = !message.isPinned;
+    await message.save();
+
+    const hydrated = await ChannelMessageModel.findById(message._id)
+      .populate('sender', 'firstName lastName email')
+      .populate('mentions', 'firstName lastName email');
+
+    res.status(200).json(toMessagePayload(hydrated));
+  } catch (error) {
+    console.error('Error pinning message:', error);
+    res.status(500).json({ error: 'Failed to pin message' });
+  }
+};
+
+export const deleteMessage = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const { channelId, messageId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      res.status(400).json({ error: 'Invalid message ID' });
+      return;
+    }
+
+    const channel = await ChannelModel.findOne({ channelId }).lean() as ChannelLean | null;
+    if (!channel) {
+      res.status(404).json({ error: 'Channel not found' });
+      return;
+    }
+
+    if (!canAccessChannel(channel, userId) || !hasJoinedChannel(channel, userId)) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    const message = await ChannelMessageModel.findById(messageId);
+    if (!message) {
+      res.status(404).json({ error: 'Message not found' });
+      return;
+    }
+
+    if (message.sender.toString() !== userId) {
+      res.status(403).json({ error: 'You can only delete your own messages' });
+      return;
+    }
+
+    await ChannelMessageModel.findByIdAndDelete(messageId);
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Error deleting message:', error);
+    res.status(500).json({ error: 'Failed to delete message' });
   }
 };

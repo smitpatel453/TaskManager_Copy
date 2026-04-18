@@ -100,10 +100,47 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
             });
 
             newSocket.on('connect_error', (error) => {
-                console.error(`⚠️ Socket connection error:`, error?.message || error);
-                console.error(`   Message: ${(error as any)?.data?.message || 'Unknown error'}`);
-                const transport = newSocket.io.engine.transport.name;
-                console.error(`   Transport: ${transport}`);
+                console.error(`⚠️ Socket connection error - ${error?.message || error}`);
+                
+                // More detailed error info
+                if ((error as any)?.data) {
+                    console.error(`   Error Details: ${(error as any).data.message}`);
+                }
+                
+                const transport = newSocket.io.engine?.transport?.name;
+                if (transport) {
+                    console.error(`   Transport: ${transport}`);
+                }
+                
+                // Determine the error type for specific guidance
+                const errorMsg = error?.message || String(error);
+                const errorType = errorMsg.toLowerCase();
+                
+                // Help the user debug with specific guidance
+                console.warn(`📋 Troubleshooting Tips:`);
+                console.warn(`   1. Is backend running on ${apiUrl}?`);
+                console.warn(`      • Run: curl -i http://localhost:3001/health`);
+                console.warn(`   2. Check your environment configuration`);
+                console.warn(`      • Frontend API: ${apiUrl}`);
+                console.warn(`      • Check NEXT_PUBLIC_API_URL in .env.local`);
+                console.warn(`   3. Verify authentication token exists`);
+                console.warn(`      • Token: ${token ? '✓ Present' : '✗ Missing (login required)'}`);
+                console.warn(`   4. Backend CORS must include frontend URL`);
+                console.warn(`      • Check backend/src/middlewares/cors.ts`);
+                
+                // Specific error patterns
+                if (errorType.includes('unauthorized') || errorType.includes('403')) {
+                    console.warn(`\n   🔒 Authentication Error:`);
+                    console.warn(`      • Token may be expired (login again)`);
+                    console.warn(`      • Backend API_SECRET mismatch`);
+                } else if (errorType.includes('network') || errorType.includes('econnrefused')) {
+                    console.warn(`\n   🌐 Network Error:`);
+                    console.warn(`      • Backend is not running`);
+                    console.warn(`      • Firewall may be blocking port 3001`);
+                    console.warn(`      • Wrong API URL configured`);
+                }
+                
+                console.warn(`📖 For detailed help: See SOCKET_IO_TROUBLESHOOTING.md`);
             });
 
             // Track join_channel emissions for auto-rejoin on reconnect
@@ -147,4 +184,19 @@ export function useSocket() {
         throw new Error('useSocket must be used within SocketProvider');
     }
     return context;
+}
+
+/**
+ * Hook to display connection status in UI
+ * Useful for showing connection indicators or handling offline states
+ */
+export function useSocketStatus() {
+    const { isConnected } = useSocket();
+    
+    return {
+        isConnected,
+        status: isConnected ? 'connected' : 'disconnected',
+        statusText: isConnected ? '🟢 Connected' : '🔴 Disconnected',
+        canUseLiveFeatures: isConnected,
+    };
 }

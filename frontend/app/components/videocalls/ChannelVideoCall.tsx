@@ -243,6 +243,18 @@ export function ChannelVideoCall({ channelId, channelName, onCallEnd, theme = 'd
                     await videocallsApi.leaveCall(channelId);
                 }
                 globalEndCall();
+                
+                // Emit call-ended event to socket so it appears in chat
+                if (socket) {
+                    socket.emit('channel:call-ended', {
+                        callId,
+                        channelId,
+                        duration: callDuration,
+                        callType: 'video',
+                        status: callDuration > 0 ? 'completed' : 'declined',
+                        initiatorId: currentUser?._id,
+                    });
+                }
             }
         } catch (err) {
             console.error('Error leaving call:', err);
@@ -253,7 +265,7 @@ export function ChannelVideoCall({ channelId, channelName, onCallEnd, theme = 'd
                 onCallEnd?.();
             }
         }
-    }, [channelId, callId, onCallEnd, globalEndCall]);
+    }, [channelId, callId, callDuration, currentUser, onCallEnd, globalEndCall, socket]);
 
     const toggleFullscreen = useCallback(async () => {
         if (!containerRef.current) return;

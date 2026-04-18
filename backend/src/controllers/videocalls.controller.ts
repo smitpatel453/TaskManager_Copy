@@ -4,6 +4,7 @@ import { UserMongooseModel } from '../models/user.model.js';
 import { CallHistoryModel } from '../models/callHistory.model.js';
 import { liveKitService } from '../services/livekit.service.js';
 import { getIO } from '../infrastructure/socket.js';
+import { CallEventLogger } from '../services/callEventLogger.service.js';
 import mongoose from 'mongoose';
 
 // Start a video call in a channel
@@ -232,6 +233,9 @@ export async function endChannelVideoCall(req: Request, res: Response): Promise<
             return;
         }
 
+        // Save initiator ID before clearing the active call
+        const initiatorId = channel.activeCall.initiatorId;
+
         // Calculate call duration
         const endedAt = new Date();
         const duration = Math.floor((endedAt.getTime() - channel.activeCall.startedAt.getTime()) / 1000);
@@ -247,6 +251,17 @@ export async function endChannelVideoCall(req: Request, res: Response): Promise<
         // Clear the active call
         channel.activeCall = null;
         await channel.save();
+
+        // Create call history message in the channel
+        if (callId) {
+            try {
+                const callHistoryObjectId = new mongoose.Types.ObjectId(callId);
+                await CallEventLogger.logCallEvent(channelId, callHistoryObjectId, initiatorId);
+            } catch (logError) {
+                console.error('Error logging call event:', logError);
+                // Don't fail the request if logging fails
+            }
+        }
 
         // Notify all users that the call has ended
         const io = getIO();
@@ -269,6 +284,7 @@ export async function endChannelVideoCall(req: Request, res: Response): Promise<
 export async function leaveChannelVideoCall(req: Request, res: Response): Promise<void> {
     try {
         const { channelId } = req.params;
+        const { callId } = req.body;
         const userId = (req as any).user?.userId;
 
         if (!userId || !channelId) {
@@ -281,6 +297,9 @@ export async function leaveChannelVideoCall(req: Request, res: Response): Promis
             res.status(400).json({ error: 'No active call in this channel' });
             return;
         }
+
+        // Save initiator before clearing
+        const initiatorId = channel.activeCall.initiatorId;
 
         // Remove user from participants
         channel.activeCall.participants = channel.activeCall.participants.filter(
@@ -301,12 +320,22 @@ export async function leaveChannelVideoCall(req: Request, res: Response): Promis
         const io = getIO();
 
         if (wasLastParticipant) {
-            // If this was the last participant, emit call-ended so all clients know the call is over
+            // If this was the last participant, log the call event and emit call-ended
+            if (callId) {
+                try {
+                    const callHistoryObjectId = new mongoose.Types.ObjectId(callId);
+                    await CallEventLogger.logCallEvent(channelId, callHistoryObjectId, initiatorId);
+                } catch (logError) {
+                    console.error('Error logging call event on last participant leave:', logError);
+                }
+            }
+
             io.to(channelId).emit('channel:call-ended', {
                 channelId,
                 endedBy: userId,
                 endedAt: new Date(),
                 reason: 'last_participant_left',
+                callId,
             });
         } else {
             // Otherwise, just notify that a user left

@@ -36,6 +36,7 @@ interface VoiceCallProps {
     url?: string;
     roomName?: string;
     callId?: string;
+    currentUser?: { _id: string; firstName: string; lastName: string } | null;
 }
 
 // Helper to get remote audio level
@@ -165,8 +166,7 @@ export function ChannelVoiceCall({
     token: propsToken, 
     url: propsUrl, 
     roomName: propsRoomName, 
-    callId: propsCallId 
-}: VoiceCallProps) {
+    callId: propsCallId,currentUser,}: VoiceCallProps) {
     const [token, setToken] = useState<string>(propsToken || '');
     const [url, setUrl] = useState<string>(propsUrl || '');
     const [roomName, setRoomName] = useState<string>(propsRoomName || '');
@@ -274,10 +274,21 @@ export function ChannelVoiceCall({
             if (explicit) {
                 if (durationInterval.current) clearInterval(durationInterval.current);
                 if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+                
+                // Emit call-ended event with metadata
+                socket?.emit('channel:call-ended', {
+                    callId,
+                    channelId,
+                    duration: callDuration,
+                    callType: 'voice',
+                    status: callDuration > 0 ? 'completed' : 'declined',
+                    initiatorId: currentUser?._id,
+                });
+                
                 onCallEnd?.();
             }
         }
-    }, [channelId, callId, onCallEnd, globalEndCall]);
+    }, [channelId, callId, callDuration, onCallEnd, globalEndCall, socket, currentUser]);
 
     const formatDuration = (seconds: number) => {
         const mins = Math.floor(seconds / 60);

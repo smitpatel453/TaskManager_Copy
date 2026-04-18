@@ -12,6 +12,10 @@ import {
     getChannelUsers,
     joinChannel,
     uploadChannelFiles,
+    starMessage,
+    pinMessage,
+    deleteMessage,
+    logChannelCall,
 } from '../controllers/channels.controller.js';
 
 const router = Router();
@@ -30,6 +34,10 @@ router.post('/:channelId/join', joinChannel);
 router.post('/:channelId/members', addChannelMember);
 router.get('/:channelId/messages', getChannelMessages);
 router.post('/:channelId/messages', createChannelMessage);
+router.post('/:channelId/call-log', logChannelCall);
+router.patch('/:channelId/messages/:messageId/star', starMessage);
+router.patch('/:channelId/messages/:messageId/pin', pinMessage);
+router.delete('/:channelId/messages/:messageId', deleteMessage);
 router.post('/:channelId/uploads', upload.array('files', 5), uploadChannelFiles);
 router.get('/:channelId/mentions', getChannelMentionSuggestions);
 

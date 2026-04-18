@@ -17,12 +17,28 @@ export type ChannelAttachment = {
 export type ChannelMessage = {
     _id: string;
     channelId: string;
-    text: string;
+    text?: string;
     sender: ChannelUser | null;
     mentions: ChannelUser[];
     attachments: ChannelAttachment[];
+    replyTo?: {
+        messageId: string;
+        text: string;
+        senderName: string;
+        senderId: string;
+    } | null;
     createdAt: string;
     updatedAt: string;
+    messageType?: 'text' | 'call' | 'system';
+    isSystemMessage?: boolean;
+    callHistory?: {
+        type: 'audio' | 'video';
+        duration: number;
+        participants: ChannelUser[];
+        initiatorId: string;
+        status: 'completed' | 'missed' | 'declined';
+        callHistoryId: string;
+    };
 };
 
 export type Channel = {
@@ -78,6 +94,12 @@ export const channelsApi = {
             text?: string;
             mentions?: string[];
             attachments?: ChannelAttachment[];
+            replyTo?: {
+                messageId: string;
+                text: string;
+                senderName: string;
+                senderId: string;
+            } | null;
         }
     ) => {
         const response = await api.post<ChannelMessage>(`/channels/${channelId}/messages`, data);
@@ -100,6 +122,20 @@ export const channelsApi = {
         const response = await api.get<ChannelUser[]>(`/channels/${channelId}/mentions`, {
             params: { q: query },
         });
+        return response.data;
+    },
+
+    logCall: async (
+        channelId: string,
+        data: {
+            callType: 'voice' | 'video';
+            status: 'completed' | 'missed' | 'declined';
+            duration: number;
+            participants?: string[];
+            initiatorId?: string;
+        }
+    ) => {
+        const response = await api.post<ChannelMessage>(`/channels/${channelId}/call-log`, data);
         return response.data;
     },
 };

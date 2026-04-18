@@ -83,8 +83,8 @@ export const videocallsApi = {
     },
 
     // Leave the call
-    leaveCall: async (channelId: string): Promise<{ success: boolean; message: string }> => {
-        const response = await api.post(`/videocalls/${channelId}/leave-call`);
+    leaveCall: async (channelId: string, callId?: string): Promise<{ success: boolean; message: string }> => {
+        const response = await api.post(`/videocalls/${channelId}/leave-call`, callId ? { callId } : {});
         return response.data;
     },
 
