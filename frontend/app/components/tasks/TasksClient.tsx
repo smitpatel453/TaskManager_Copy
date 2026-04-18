@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 
 import TaskTable from "./TaskTable";
+import AddTaskForm from "./AddTaskForm";
 import { SkeletonTasksList } from "../Skeleton";
 
 export default function TasksClient() {
@@ -12,8 +13,15 @@ export default function TasksClient() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "board">("list");
+  const [refreshKey, setRefreshKey] = useState(0);
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
+
+  const handleTaskAdded = () => {
+    // Refresh task list by invalidating cache
+    queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    setRefreshKey(k => k + 1);
+  };
 
   const filterParam = useMemo(() => searchParams.get("filter") || "", [searchParams]);
   const projectParam = useMemo(() => searchParams.get("project") || "", [searchParams]);
@@ -100,18 +108,23 @@ export default function TasksClient() {
     <div className="space-y-0">
       {/* Breadcrumb + View Tabs */}
       <div className="border-b border-[var(--border-subtle)] pb-0 md:-mx-6 md:px-6 -mt-6 pt-4 bg-[var(--bg-canvas)] px-4">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2.5 mb-3 text-[var(--text-tertiary)] flex-wrap">
-          <div className="w-4 sm:w-5 h-4 sm:h-5 rounded bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-            </svg>
+        {/* Breadcrumb with Add Task button */}
+        <div className="flex items-center justify-between gap-2.5 mb-3 text-[var(--text-tertiary)] flex-wrap">
+          <div className="flex items-center gap-2.5">
+            <div className="w-4 sm:w-5 h-4 sm:h-5 rounded bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+              </svg>
+            </div>
+            <span className="font-semibold text-[var(--text-primary)] text-[13px] sm:text-[16px]">
+              {projectParam ? (isAdmin ? "All Projects" : "My Projects") : "My Tasks"}
+            </span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="hidden sm:inline"><polyline points="9 18 15 12 9 6" /></svg>
+            <span className="font-semibold text-[var(--text-primary)] text-[13px] sm:text-[16px]">{getBreadcrumbLabel()}</span>
           </div>
-          <span className="font-semibold text-[var(--text-primary)] text-[13px] sm:text-[16px]">
-            {projectParam ? (isAdmin ? "All Projects" : "My Projects") : "My Tasks"}
-          </span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="hidden sm:inline"><polyline points="9 18 15 12 9 6" /></svg>
-          <span className="font-semibold text-[var(--text-primary)] text-[13px] sm:text-[16px]">{getBreadcrumbLabel()}</span>
+          <div className="flex-shrink-0">
+            <AddTaskForm onAdded={handleTaskAdded} />
+          </div>
         </div>
 
         {/* View Nav Tabs */}
@@ -134,7 +147,7 @@ export default function TasksClient() {
       </div>
 
       {/* Task Content */}
-      <div className="mt-4">
+      <div className="mt-4" key={refreshKey}>
         <TaskTable
           initialFilter={filterParam}
           projectFilter={projectParam}

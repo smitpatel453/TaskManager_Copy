@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { TaskModel } from "../models/task.model.js";
 import { EmailService } from "./email.service.js";
 import { InboxService } from "./inbox.service.js";
+import { emitTaskUpdate } from "../infrastructure/socket.js";
 import type { CreateTaskRequest, DetailBlock, TaskStatus } from "../shared/types/index.js";
 
 function isValidTimeHHMM(value: unknown): value is string {
@@ -37,25 +38,6 @@ export class TasksService {
 
   async createTask(data: CreateTaskRequest, userId: string): Promise<any> {
     // Validate projectId if provided
-    let projectIdObj: mongoose.Types.ObjectId | undefined;
-    if (data.projectId && data.projectId.trim()) {
-      if (!mongoose.Types.ObjectId.isValid(data.projectId)) {
-        throw new Error("Invalid projectId");
-      }
-
-      // Verify project exists
-      const db = mongoose.connection.db;
-      if (!db) {
-        throw new Error("Database connection failed");
-      }
-
-      const project = await db.collection("projects").findOne({ _id: new mongoose.Types.ObjectId(data.projectId) });
-      if (!project) {
-        throw new Error("Project not found");
-      }
-      projectIdObj = new mongoose.Types.ObjectId(data.projectId);
-    }
-
     // Database connection check
     const db = mongoose.connection.db;
     if (!db) {
@@ -64,6 +46,34 @@ export class TasksService {
 
     // Check for admin privileges to determine assignment restrictions
     const isAdmin = await this.isUserAdmin(userId);
+
+    let projectIdObj: mongoose.Types.ObjectId | undefined;
+    if (data.projectId && data.projectId.trim()) {
+      if (!mongoose.Types.ObjectId.isValid(data.projectId)) {
+        throw new Error("Invalid projectId");
+      }
+
+      // Verify project exists
+      const project = await db.collection("projects").findOne({ _id: new mongoose.Types.ObjectId(data.projectId) });
+      if (!project) {
+        throw new Error("Project not found");
+      }
+
+      // HYBRID PERMISSION CHECK: Non-admins can only create tasks for projects they're assigned to
+      if (!isAdmin) {
+        const userAssignedUsers = project.assignedUsers || [];
+        const userObjectId = new mongoose.Types.ObjectId(userId);
+        const isUserAssignedToProject = userAssignedUsers.some((id: any) => 
+          id.toString() === userObjectId.toString()
+        );
+
+        if (!isUserAssignedToProject) {
+          throw new Error("You can only create tasks for projects you are assigned to. Contact your admin to be added to this project.");
+        }
+      }
+
+      projectIdObj = new mongoose.Types.ObjectId(data.projectId);
+    }
 
     // If assignedTo is not provided, check admin requirement
     if (!data.assignedTo) {
@@ -348,6 +358,35 @@ export class TasksService {
     // Update status
     task.status = status;
     await task.save();
+
+    // Fetch user details for real-time update
+    const db = mongoose.connection.db;
+    let updatedByName = "User";
+    if (db) {
+      try {
+        const user = await db.collection("users").findOne({ _id: new mongoose.Types.ObjectId(userId) });
+        if (user) {
+          updatedByName = `${user.firstName} ${user.lastName}`;
+        }
+      } catch (error) {
+        console.error("Failed to fetch user details:", error);
+      }
+    }
+
+    // Emit real-time task update to all users
+    try {
+      emitTaskUpdate(taskId, {
+        _id: task._id.toString(),
+        taskName: task.taskName,
+        status: status,
+        previousStatus: previousStatus,
+        updatedBy: userId,
+        updatedByName: updatedByName,
+        updatedAt: new Date(),
+      });
+    } catch (error) {
+      console.error("Failed to emit task update:", error);
+    }
 
     // Create inbox notification for status change
     try {

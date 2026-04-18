@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { InboxModel, NotificationType, TaskStatusNotificationType } from "../models/inbox.model.js";
 import { EmailService } from "./email.service.js";
+import { emitNotification } from "../infrastructure/socket.js";
 
 export class InboxService {
     private inboxModel: InboxModel;
@@ -11,10 +12,6 @@ export class InboxService {
         this.emailService = new EmailService();
     }
 
-    /**
-     * Create a task assignment notification
-     * Called when admin assigns a task to a user
-     */
     async notifyTaskAssigned(
         taskId: string,
         taskName: string,
@@ -42,7 +39,7 @@ export class InboxService {
             const senderName = assignedByUser ? `${assignedByUser.firstName} ${assignedByUser.lastName}` : "Admin";
 
             // Create inbox notification
-            await this.inboxModel.create({
+            const notification = await this.inboxModel.create({
                 recipientId: new mongoose.Types.ObjectId(assignedToUserId),
                 senderId: new mongoose.Types.ObjectId(assignedByUserId),
                 taskId: new mongoose.Types.ObjectId(taskId),
@@ -52,6 +49,18 @@ export class InboxService {
                 message: `${senderName} has assigned you the task "${taskName}"`,
                 isRead: false,
                 createdAt: new Date(),
+            });
+
+            // Emit real-time notification via Socket.IO
+            emitNotification(assignedToUserId, {
+                _id: notification._id.toString(),
+                title: notification.title,
+                message: notification.message,
+                type: notification.type,
+                taskName: notification.taskName,
+                taskId: notification.taskId?.toString(),
+                senderId: notification.senderId?.toString(),
+                createdAt: notification.createdAt,
             });
 
             // Send email notification
@@ -123,7 +132,7 @@ export class InboxService {
             const statusText = newStatus === "in-progress" ? "In Progress" : newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
 
             // Create inbox notification
-            await this.inboxModel.create({
+            const notification = await this.inboxModel.create({
                 recipientId: new mongoose.Types.ObjectId(notificationRecipientId),
                 senderId: new mongoose.Types.ObjectId(statusChangedByUserId),
                 taskId: new mongoose.Types.ObjectId(taskId),
@@ -135,6 +144,20 @@ export class InboxService {
                 newStatus,
                 isRead: false,
                 createdAt: new Date(),
+            });
+
+            // Emit real-time notification via Socket.IO
+            emitNotification(notificationRecipientId, {
+                _id: notification._id.toString(),
+                title: notification.title,
+                message: notification.message,
+                type: notification.type,
+                taskName: notification.taskName,
+                taskId: notification.taskId?.toString(),
+                previousStatus: notification.previousStatus,
+                newStatus: notification.newStatus,
+                senderId: notification.senderId?.toString(),
+                createdAt: notification.createdAt,
             });
 
             // Send email notification
@@ -185,6 +208,13 @@ export class InboxService {
      */
     async markAllMessagesAsRead(recipientId: string): Promise<any> {
         return await this.inboxModel.markAllAsRead(recipientId);
+    }
+
+    /**
+     * Get a specific message by ID
+     */
+    async getMessageById(messageId: string): Promise<any> {
+        return await this.inboxModel.findById(messageId);
     }
 
     /**

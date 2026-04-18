@@ -8,6 +8,7 @@ import { authApi } from "../../src/api/auth.api";
 import { channelsApi } from "../../src/api/channels.api";
 import { projectsApi } from "../../src/api/projects.api";
 import { teamsApi } from "../../src/api/teams.api";
+import { useNotifications } from "../hooks/useNotifications";
 import { SkeletonSidebarItems } from "./Skeleton";
 import { useCall } from "../providers/CallProvider";
 import { AgentAudioVisualizerRadial } from "@/components/agent-audio-visualizer-radial";
@@ -136,6 +137,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { currentAudioTrack, setCurrentAudioTrack } = useCall();
+  const { unreadCount } = useNotifications();
 
   /* ── State ── */
   const [user, setUser] = useState<User | null>(null);
@@ -601,8 +603,11 @@ export default function Sidebar({ userRole }: SidebarProps) {
         {/* Bottom Nav (Inbox, Projects, Users) */}
         {bottomNavItems.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+          // Get notification badge for Inbox
+          const notificationBadge = item.id === "inbox" ? (unreadCount > 0 ? unreadCount : undefined) : undefined;
           return (
             <NavItem key={item.id} icon={item.icon} label={item.label} active={isActive} isCollapsed={isCollapsed}
+              badge={notificationBadge}
               onClick={() => { navigateTo(item.href); onClose?.(); }}
             />
           );

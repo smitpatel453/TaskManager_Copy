@@ -11,7 +11,9 @@ export interface CallHistoryMessageData {
     lastName: string;
   }>;
   initiatorId: string;
-  status: "completed" | "missed" | "declined";
+  status: "completed" | "missed" | "rejected";
+  endedBy?: string; // Who ended the call (ID)
+  endedByName?: string; // Full name of who ended the call
 }
 
 interface CallHistoryMessageProps {
@@ -21,6 +23,7 @@ interface CallHistoryMessageProps {
     firstName: string;
     lastName: string;
   };
+  currentUserId?: string;
   createdAt: string | Date;
   isOwn: boolean;
 }
@@ -35,17 +38,59 @@ const formatDuration = (seconds: number): string => {
   return `${hours}h ${mins}m`;
 };
 
-const getCallStatusText = (status: string): string => {
-  switch (status) {
-    case "completed":
-      return "Call ended";
-    case "missed":
-      return "Missed call";
-    case "declined":
-      return "Call declined";
-    default:
-      return "Call";
+/**
+ * Generate context-aware call message based on status and user role
+ * WhatsApp-style call history display
+ */
+const generateCallMessage = (
+  data: CallHistoryMessageData,
+  sender: { _id: string; firstName: string; lastName: string },
+  currentUserId?: string
+): string => {
+  const callerName = sender.firstName;
+  
+  // Find actual receiver (could be from participants or endedBy for rejected calls)
+  let receiverId = data.participants.find((p) => p._id !== data.initiatorId)?._id;
+  let receiverName = data.participants.find((p) => p._id !== data.initiatorId)?.firstName;
+  
+  // For rejected calls, if receiver not in participants, they must be the one who ended it
+  if (data.status === "rejected" && !receiverId && data.endedBy) {
+    receiverId = data.endedBy;
+    receiverName = data.endedByName || "Someone"; // Use endedByName if available
   }
+
+  const isCurrentUserCaller = currentUserId === data.initiatorId;
+  const isCurrentUserReceiver = currentUserId === receiverId;
+
+  // MISSED CALL
+  if (data.status === "missed") {
+    if (isCurrentUserCaller) {
+      return "Call not answered";
+    } else if (isCurrentUserReceiver) {
+      return `You missed a call from ${callerName}`;
+    } else {
+      return `${callerName} missed a call`;
+    }
+  }
+
+  // REJECTED/DECLINED CALL
+  if (data.status === "rejected") {
+    if (isCurrentUserCaller) {
+      return `${receiverName || "Someone"} declined your call`;
+    } else if (isCurrentUserReceiver) {
+      return "You declined the call";
+    } else {
+      return `${receiverName || "Someone"} declined call from ${callerName}`;
+    }
+  }
+
+  // COMPLETED CALL
+  if (data.status === "completed") {
+    return data.type === "video" ? "Video call" : "Voice call";
+  }
+
+  // Fallback
+  return "Call";
 };
 
 const getCallStatusColor = (status: string): string => {
@@ -54,19 +99,41 @@ const getCallStatusColor = (status: string): string => {
       return "text-green-600 dark:text-green-400";
     case "missed":
       return "text-red-600 dark:text-red-400";
-    case "declined":
+    case "rejected":
       return "text-amber-600 dark:text-amber-400";
     default:
       return "text-blue-600 dark:text-blue-400";
   }
 };
 
+const getCallStatusSmallText = (status: string, type: string): string => {
+  switch (status) {
+    case "completed":
+      return type === "video" ? "Video call" : "Voice call";
+    case "missed":
+      return "Missed call";
+    case "rejected":
+      return "Call declined";
+    default:
+      return "Call";
+  }
+};
+
 export function CallHistoryMessage({
   data,
   sender,
+  currentUserId,
   createdAt,
   isOwn,
 }: CallHistoryMessageProps) {
+  // Guard: Only render if we have all required data
+  if (!data?.initiatorId || !data?.type || !sender?.firstName) {
+    console.warn("⚠️ CallHistoryMessage: Missing required data", { data, sender });
+    return null; // Don't render empty message boxes
+  }
+
+  const callMessage = generateCallMessage(data, sender, currentUserId);
+
   const date = new Date(createdAt);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -82,16 +149,20 @@ export function CallHistoryMessage({
   else timeText = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
   const isMissed = data.status === "missed";
-  const senderName = `${sender.firstName} ${sender.lastName}`;
+  const isRejected = data.status === "rejected";
+  const backgroundColor =
+    isMissed || isRejected
+      ? "bg-red-50 dark:bg-red-900/20"
+      : "bg-blue-50 dark:bg-blue-900/20";
+  const borderColor =
+    isMissed || isRejected
+      ? "border-red-200 dark:border-red-800"
+      : "border-blue-200 dark:border-blue-800";
 
   return (
     <div className={`flex ${isOwn ? "justify-end" : "justify-start"} mb-3`}>
       <div
-        className={`flex items-center gap-3 px-4 py-3 rounded-2xl border ${
-          isMissed
-            ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
-            : "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
-        } max-w-xs`}
+        className={`flex items-center gap-3 px-4 py-3 rounded-2xl border ${backgroundColor} ${borderColor} max-w-xs`}
       >
         {/* Call Icon */}
         <div className={`flex-shrink-0 ${getCallStatusColor(data.status)}`}>
@@ -118,32 +189,28 @@ export function CallHistoryMessage({
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
             <span className={`text-[13px] font-semibold ${getCallStatusColor(data.status)}`}>
-              {data.type === "video" ? "📹" : "☎️"} {getCallStatusText(data.status)}
+              {data.status === "missed" && "❌"}
+              {data.status === "rejected" && "❌"}
+              {data.status === "completed" && (data.type === "video" ? "🎥" : "☎️")}
+              {" "}
+              {getCallStatusSmallText(data.status, data.type)}
             </span>
           </div>
 
-          {/* Participants */}
-          <p className="text-[12px] text-[var(--text-muted)]">
-            {isOwn ? "You called" : `${senderName} called`}
-            {data.participants.length > 0 && (
-              <>
-                {" "}
-                {data.participants
-                  .map((p) => `${p.firstName}`)
-                  .join(", ")}
-              </>
-            )}
+          {/* Context-aware message */}
+          <p className="text-[12px] text-gray-700 dark:text-gray-300 font-medium">
+            {callMessage}
           </p>
 
-          {/* Duration (only if completed) */}
+          {/* Duration (only if completed and > 0) */}
           {data.status === "completed" && data.duration > 0 && (
-            <p className="text-[12px] text-[var(--text-secondary)] font-medium">
+            <p className="text-[12px] text-gray-600 dark:text-gray-400 font-medium">
               ⏱️ {formatDuration(data.duration)}
             </p>
           )}
 
           {/* Time */}
-          <p className="text-[11px] text-[var(--text-muted)] mt-1">{timeText}</p>
+          <p className="text-[11px] text-gray-600 dark:text-gray-400 mt-1">{timeText}</p>
         </div>
 
         {/* Call Type Badge */}

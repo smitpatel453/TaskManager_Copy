@@ -96,12 +96,11 @@ export class InboxController {
         return;
       }
 
-      // Verify the message belongs to the user
+      // Verify the message belongs to the user before deleting
       const inboxService = new InboxService();
-      const messages = await inboxService.getInboxMessages(userId, 1, 0);
-      const message = messages.messages.find((m: any) => m._id.toString() === messageId);
+      const message = await inboxService.getMessageById(messageId);
 
-      if (!message) {
+      if (!message || message.recipientId.toString() !== userId) {
         res.status(403).json({ error: "Access denied or message not found" });
         return;
       }

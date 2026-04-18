@@ -4,6 +4,7 @@ import "./global.css";
 import ReactQueryProvider from "./providers/ReactQueryProvider";
 import { SocketProvider } from "./providers/SocketProvider";
 import { GlobalIncomingCallBanner } from "./components/videocalls/IncomingCallBanner";
+import { NotificationToastContainer } from "./components/NotificationToastContainer";
 import { cn } from "@/lib/utils";
 import { PrimeReactProvider } from "primereact/api";
 
@@ -44,6 +45,8 @@ export default function RootLayout({
               {children}
               {/* Global incoming call notification — visible on every page */}
               <GlobalIncomingCallBanner />
+              {/* Global notification toasts — visible on every page */}
+              <NotificationToastContainer />
             </PrimeReactProvider>
           </SocketProvider>
         </ReactQueryProvider>

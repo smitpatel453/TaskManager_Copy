@@ -130,7 +130,7 @@ export default function AddTaskForm({ onAdded, queryClient: qc }: AddTaskFormPro
     if (validDetails.length === 0) return "Please add at least one detail.";
     if (hours == 0) return "Hours cannot be 0. Please enter the estimated hours for the task.";
     if (isAdmin && !assignedTo) return "Assignment is required for admins (choose a user).";
-    if (isAdmin && !projectId) return "Please select a project.";
+    if (!projectId) return `Please select a project. ${isAdmin ? "" : "You can only create tasks for projects you are assigned to."}`;
     if (!startDate) return "Please select a start date.";
     if (!dueDate) return "Please select a due date.";
     if (startDate && dueDate && new Date(dueDate) < new Date(startDate)) {
@@ -274,6 +274,23 @@ export default function AddTaskForm({ onAdded, queryClient: qc }: AddTaskFormPro
             </div>
 
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
+              {/* Role-based Information Box */}
+              {!isAdmin && (
+                <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-3">
+                  <p className="text-sm text-blue-600 font-medium">
+                    💡 Hybrid Permissions: You can create tasks for projects you're assigned to. Tasks are automatically assigned to you.
+                  </p>
+                </div>
+              )}
+
+              {isAdmin && (
+                <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3">
+                  <p className="text-sm text-amber-600 font-medium">
+                    👤 Admin Mode: You can create tasks for any project and assign them to any team member.
+                  </p>
+                </div>
+              )}
+
               {error && (
                 <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3">
                   <p className="text-sm text-[var(--status-error)]">{error}</p>
@@ -297,16 +314,17 @@ export default function AddTaskForm({ onAdded, queryClient: qc }: AddTaskFormPro
               {isAdmin && (
                 <div>
                   <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                    Assign to user (optional for personal task)
+                    Assign to user <span className="text-[var(--status-error)]">*</span>
                   </label>
                   <select
                     value={assignedTo}
                     onChange={(e) => setAssignedTo(e.target.value)}
+                    required
                     className="claude-input w-full"
                     disabled={loadingUsers}
                   >
                     <option value="">
-                      {loadingUsers ? "Loading users..." : "Select a user (or leave for personal task)"}
+                      {loadingUsers ? "Loading users..." : "Select a team member"}
                     </option>
                     {users.map((user) => (
                       <option key={user._id} value={user._id}>
@@ -317,14 +335,22 @@ export default function AddTaskForm({ onAdded, queryClient: qc }: AddTaskFormPro
                 </div>
               )}
 
+              {!isAdmin && (
+                <div className="rounded-lg bg-green-500/10 border border-green-500/20 p-3">
+                  <p className="text-sm text-green-600">
+                    ✓ This task will be automatically assigned to you.
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                  Project {!isAdmin && <span className="text-[var(--text-muted)]">(optional)</span>}
+                  Project <span className="text-[var(--status-error)]">*</span>
                 </label>
                 <select
                   value={projectId}
                   onChange={(e) => setProjectId(e.target.value)}
-                  required={isAdmin}
+                  required
                   className="claude-input w-full"
                   disabled={loadingProjects}
                 >
@@ -332,8 +358,8 @@ export default function AddTaskForm({ onAdded, queryClient: qc }: AddTaskFormPro
                     {loadingProjects
                       ? "Loading projects..."
                       : projects.length === 0
-                      ? "No projects available"
-                      : isAdmin ? "Select a project" : "Select a project (optional)"}
+                      ? isAdmin ? "No projects available" : "You are not assigned to any projects"
+                      : "Select a project"}
                   </option>
                   {projects.map((project) => (
                     <option key={project._id} value={project._id}>
@@ -341,6 +367,11 @@ export default function AddTaskForm({ onAdded, queryClient: qc }: AddTaskFormPro
                     </option>
                   ))}
                 </select>
+                {!isAdmin && projects.length === 0 && (
+                  <p className="text-xs text-[var(--text-muted)] mt-1">
+                    Contact your admin to be assigned to a project.
+                  </p>
+                )}
               </div>
 
               <div>

@@ -111,6 +111,14 @@ export class InboxModel {
         );
     }
 
+    async findById(messageId: string): Promise<InboxMessageDocument | null> {
+        if (!mongoose.Types.ObjectId.isValid(messageId)) {
+            throw new Error("Invalid message ID");
+        }
+
+        return this.model.findById(messageId).populate("senderId", "firstName lastName email").exec();
+    }
+
     async deleteMessage(messageId: string): Promise<any> {
         if (!mongoose.Types.ObjectId.isValid(messageId)) {
             throw new Error("Invalid message ID");

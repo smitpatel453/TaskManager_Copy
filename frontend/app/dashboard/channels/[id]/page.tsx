@@ -1120,25 +1120,8 @@ export default function ChannelPage() {
                                       </div>
                                     )}
 
-                                    {/* Call history message */}
-                                    {(msg as any).messageType === 'call' && (msg as any).callHistory ? (
-                                      <CallHistoryMessage 
-                                        data={{
-                                          type: (msg as any).callHistory.type,
-                                          duration: (msg as any).callHistory.duration,
-                                          participants: (msg as any).callHistory.participants || [],
-                                          initiatorId: (msg as any).callHistory.initiatorId,
-                                          status: (msg as any).callHistory.status,
-                                        }}
-                                        sender={{
-                                          _id: msg.sender?._id || 'unknown',
-                                          firstName: msg.sender?.firstName || 'Unknown',
-                                          lastName: msg.sender?.lastName || 'User',
-                                        }}
-                                        createdAt={msg.createdAt}
-                                        isOwn={msg.sender?._id === currentUser?._id}
-                                      />
-                                    ) : msg.text ? (
+                                    {/* Only render text messages */}
+                                    {msg.text ? (
                                       <p className="text-[14px] leading-relaxed break-words">
                                         {renderMessageText(msg.text)}
                                       </p>

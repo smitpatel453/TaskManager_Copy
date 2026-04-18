@@ -252,16 +252,15 @@ export async function endChannelVideoCall(req: Request, res: Response): Promise<
         channel.activeCall = null;
         await channel.save();
 
-        // Create call history message in the channel
-        if (callId) {
-            try {
-                const callHistoryObjectId = new mongoose.Types.ObjectId(callId);
-                await CallEventLogger.logCallEvent(channelId, callHistoryObjectId, initiatorId);
-            } catch (logError) {
-                console.error('Error logging call event:', logError);
-                // Don't fail the request if logging fails
-            }
-        }
+        // DISABLED: Call history message logging - removed to prevent issues
+        // if (callId) {
+        //     try {
+        //         const callHistoryObjectId = new mongoose.Types.ObjectId(callId);
+        //         await CallEventLogger.logCallEvent(channelId, callHistoryObjectId, initiatorId);
+        //     } catch (logError) {
+        //         console.error('Error logging call event:', logError);
+        //     }
+        // }
 
         // Notify all users that the call has ended
         const io = getIO();
@@ -320,15 +319,15 @@ export async function leaveChannelVideoCall(req: Request, res: Response): Promis
         const io = getIO();
 
         if (wasLastParticipant) {
-            // If this was the last participant, log the call event and emit call-ended
-            if (callId) {
-                try {
-                    const callHistoryObjectId = new mongoose.Types.ObjectId(callId);
-                    await CallEventLogger.logCallEvent(channelId, callHistoryObjectId, initiatorId);
-                } catch (logError) {
-                    console.error('Error logging call event on last participant leave:', logError);
-                }
-            }
+            // DISABLED: Call history message logging - removed to prevent issues
+            // if (callId) {
+            //     try {
+            //         const callHistoryObjectId = new mongoose.Types.ObjectId(callId);
+            //         await CallEventLogger.logCallEvent(channelId, callHistoryObjectId, initiatorId);
+            //     } catch (logError) {
+            //         console.error('Error logging call event on last participant leave:', logError);
+            //     }
+            // }
 
             io.to(channelId).emit('channel:call-ended', {
                 channelId,

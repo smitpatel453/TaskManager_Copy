@@ -4,6 +4,7 @@ import { CORS_CONFIG } from '../middlewares/cors.js';
 import { ChannelMessageModel } from '../models/channelMessage.model.js';
 import { verifyToken } from './database/jwt.js';
 import { ChannelModel } from '../models/channel.model.js';
+import { InboxModel } from '../models/inbox.model.js';
 import mongoose from 'mongoose';
 
 function canAccessChannel(channel: { isPrivate: boolean; members: Array<{ toString: () => string }> }, userId: string): boolean {
@@ -216,6 +217,62 @@ export const initializeSocket = (httpServer: HttpServer) => {
       }
     });
 
+    socket.on('send_notification', async (data: {
+      recipientId: string;
+      title: string;
+      message: string;
+      type: string;
+      taskName?: string;
+      taskId?: string;
+      newStatus?: string;
+      previousStatus?: string;
+    }) => {
+      try {
+        const senderId = socket.data.userId as string | undefined;
+        if (!senderId || !data.recipientId) return;
+
+        // Save notification to database
+        const inboxModel = new InboxModel();
+        const notification = await inboxModel.create({
+          recipientId: new mongoose.Types.ObjectId(data.recipientId),
+          senderId: new mongoose.Types.ObjectId(senderId),
+          taskId: data.taskId ? new mongoose.Types.ObjectId(data.taskId) : null,
+          taskName: data.taskName || 'Notification',
+          type: data.type || 'task-assigned',
+          title: data.title,
+          message: data.message,
+          newStatus: data.newStatus,
+          previousStatus: data.previousStatus,
+          isRead: false,
+          createdAt: new Date(),
+        });
+
+        // Emit to recipient in real-time
+        io.to(`user:${data.recipientId}`).emit('notification:received', {
+          _id: notification._id,
+          title: notification.title,
+          message: notification.message,
+          type: notification.type,
+          taskName: notification.taskName,
+          taskId: notification.taskId,
+          newStatus: notification.newStatus,
+          isRead: false,
+          createdAt: notification.createdAt,
+        });
+
+        console.log(`📬 Notification sent to user ${data.recipientId}`);
+      } catch (error) {
+        console.error('Error handling send_notification event:', error);
+      }
+    });
+
+    // Join user-specific room for notifications
+    const userId = socket.data.userId as string | undefined;
+    if (userId) {
+      socket.join(`user:${userId}`);
+      console.log(`✓ Socket joined user room: user:${userId}`);
+    }
+
     socket.on('disconnect', (reason) => {
       const transport = socket.conn?.transport?.name || 'unknown';
       console.log(`🔌 Client disconnected: ${socket.id}`);
@@ -230,4 +287,77 @@ export const initializeSocket = (httpServer: HttpServer) => {
 export const getIO = () => {
   if (!io) throw new Error("Socket.io not initialized!");
   return io;
+};
+
+/**
+ * Emit a real-time notification to a specific user
+ * Called from services when notifications are created
+ */
+export const emitNotification = (recipientId: string, notification: {
+  _id: string;
+  title: string;
+  message: string;
+  type: string;
+  taskName?: string;
+  taskId?: string;
+  newStatus?: string;
+  previousStatus?: string;
+  senderId?: string;
+  createdAt: Date;
+}) => {
+  try {
+    if (!io) return console.warn('Socket.IO not initialized, cannot emit notification');
+    
+    io.to(`user:${recipientId}`).emit('notification:received', {
+      _id: notification._id,
+      title: notification.title,
+      message: notification.message,
+      type: notification.type,
+      taskName: notification.taskName || 'Notification',
+      taskId: notification.taskId,
+      newStatus: notification.newStatus,
+      previousStatus: notification.previousStatus,
+      senderId: notification.senderId,
+      isRead: false,
+      createdAt: notification.createdAt,
+    });
+
+    console.log(`📬 Real-time notification emitted to user ${recipientId}`);
+  } catch (error) {
+    console.error('Error emitting notification:', error);
+  }
+};
+
+/**
+ * Emit task updates in real-time to all connected users
+ * Broadcasts to a 'tasks' namespace so any user viewing tasks gets the update
+ */
+export const emitTaskUpdate = (taskId: string, taskData: {
+  _id: string;
+  taskName: string;
+  status: string;
+  previousStatus?: string;
+  updatedBy?: string;
+  updatedByName?: string;
+  updatedAt: Date;
+}) => {
+  try {
+    if (!io) return console.warn('Socket.IO not initialized, cannot emit task update');
+    
+    // Broadcast to a global 'tasks' room (all users viewing tasks)
+    io.emit('task:updated', {
+      _id: taskData._id,
+      taskId: taskId,
+      taskName: taskData.taskName,
+      status: taskData.status,
+      previousStatus: taskData.previousStatus,
+      updatedBy: taskData.updatedBy,
+      updatedByName: taskData.updatedByName,
+      updatedAt: taskData.updatedAt,
+    });
+
+    console.log(`📋 Task update emitted: ${taskData.taskName} → ${taskData.status}`);
+  } catch (error) {
+    console.error('Error emitting task update:', error);
+  }
 };

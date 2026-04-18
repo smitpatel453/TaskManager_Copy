@@ -12,6 +12,8 @@ export interface CallHistoryDocument extends Document {
     recordingEnabled: boolean;
     recordingStartedAt?: Date; // When recording was started
     type: 'voice' | 'video';
+    status: 'completed' | 'missed' | 'rejected'; // Call outcome
+    endedBy?: mongoose.Types.ObjectId; // Who ended the call (for rejected detection)
     durationVerifiedByLiveKit?: boolean; // Flag to indicate if duration came from LiveKit webhook
     messagesSent: number;
     createdAt: Date;
@@ -31,6 +33,8 @@ const callHistorySchema = new Schema<CallHistoryDocument>(
         recordingEnabled: { type: Boolean, default: false },
         recordingStartedAt: { type: Date },
         type: { type: String, enum: ['voice', 'video'], default: 'video' },
+        status: { type: String, enum: ['completed', 'missed', 'rejected'], default: 'completed' },
+        endedBy: { type: Schema.Types.ObjectId, ref: "users" },
         durationVerifiedByLiveKit: { type: Boolean, default: false },
         messagesSent: { type: Number, default: 0 },
     },

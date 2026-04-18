@@ -7,12 +7,14 @@ import { Dropdown } from "primereact/dropdown";
 import { Avatar } from "primereact/avatar";
 import { Password } from "primereact/password";
 import { authApi } from "../../../src/api/auth.api";
+import { useNotifications } from "../../hooks/useNotifications";
 import axios from "axios";
 
 type SettingsSection = "profile" | "account" | "appearance" | "audio-video" | "accessibility" | "notifications";
 
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState<SettingsSection>("profile");
+  const { notifications, unreadCount, loading: notificationsLoading, markAsRead, deleteNotification } = useNotifications();
   
   // User Profile State
   const [user, setUser] = useState<{ firstName: string; lastName: string; email: string; avatar?: string } | null>(null);
@@ -316,9 +318,10 @@ export default function SettingsPage() {
   const handleDeleteAccount = async () => {
     setDeleteLoading(true);
     try {
-      await authApi.deleteAccount();
-      localStorage.clear();
-      window.location.href = "/";
+      // TODO: Implement delete account endpoint in backend
+      alert("Delete account feature is not yet implemented");
+      setDeleteLoading(false);
+      setShowDeleteConfirm(false);
     } catch (err: any) {
       console.error("Delete account error:", err);
       setDeleteLoading(false);
@@ -970,6 +973,75 @@ export default function SettingsPage() {
                         className="p-button-success px-6"
                       />
                     </div>
+                  </div>
+                </section>
+
+                {/* Real-time Notifications */}
+                <section>
+                  <h2 className="text-xl font-bold text-[var(--text-primary)] mb-6">Notifications ({unreadCount} unread)</h2>
+                  <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl p-8">
+                    {notificationsLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full"></div>
+                      </div>
+                    ) : notifications.length === 0 ? (
+                      <div className="text-center py-8">
+                        <p className="text-[var(--text-muted)]">No notifications yet</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                        {notifications.map((notification) => (
+                          <div
+                            key={notification._id}
+                            className={`p-4 rounded-lg border transition-all ${
+                              notification.isRead
+                                ? "bg-[var(--bg-canvas)] border-[var(--border-subtle)]"
+                                : "bg-[var(--accent)]/5 border-[var(--accent)]/20"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="text-[13px] font-semibold text-[var(--text-primary)]">
+                                    {notification.title}
+                                  </h4>
+                                  {!notification.isRead && (
+                                    <span className="w-2 h-2 rounded-full bg-[var(--accent)] flex-shrink-0"></span>
+                                  )}
+                                </div>
+                                <p className="text-[12px] text-[var(--text-secondary)] mt-1">
+                                  {notification.message}
+                                </p>
+                                {notification.taskName && (
+                                  <p className="text-[11px] text-[var(--text-muted)] mt-2">
+                                    Task: {notification.taskName}
+                                  </p>
+                                )}
+                                <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                                  {new Date(notification.createdAt).toLocaleString()}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                {!notification.isRead && (
+                                  <Button
+                                    icon="pi pi-check"
+                                    className="p-button-text p-button-sm"
+                                    onClick={() => markAsRead(notification._id)}
+                                    title="Mark as read"
+                                  />
+                                )}
+                                <Button
+                                  icon="pi pi-trash"
+                                  className="p-button-text p-button-danger p-button-sm"
+                                  onClick={() => deleteNotification(notification._id)}
+                                  title="Delete notification"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </section>
               </div>

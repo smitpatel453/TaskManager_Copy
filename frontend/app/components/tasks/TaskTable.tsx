@@ -5,6 +5,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { tasksApi } from "../../../src/api/tasks.api";
 import { projectsApi } from "../../../src/api/projects.api";
+import { useTaskUpdates } from "../../hooks/useTaskUpdates";
 
 export type TaskDetail = {
   text: string;
@@ -80,6 +81,10 @@ const groupConfigs = {
 
 export default function TaskTable({ initialFilter, projectFilter, assignedToFilter, readOnly = false, viewMode = "list" }: TaskTableProps) {
   const queryClient = useQueryClient();
+  
+  // Subscribe to real-time task updates
+  useTaskUpdates();
+  
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<"to-do" | "in-progress" | "completed" | null>(null);
