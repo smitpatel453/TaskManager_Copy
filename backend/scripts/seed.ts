@@ -76,29 +76,22 @@ async function seedRoles(db: mongoose.mongo.Db) {
   log.header("Seeding Roles");
   const collection = db.collection("roles");
 
-  const roleIds: Record<string, mongoose.Types.ObjectId> = {};
-
   for (const roleData of ROLES) {
     const existing = await collection.findOne({ name: roleData.name });
 
     if (existing) {
       log.skip(`Role "${roleData.name}" already exists  →  _id: ${existing._id}`);
-      roleIds[roleData.name] = existing._id as mongoose.Types.ObjectId;
     } else {
       const now = new Date();
       const result = await collection.insertOne({ ...roleData, createdAt: now, updatedAt: now });
       log.success(`Created role "${roleData.name}"  →  _id: ${result.insertedId}`);
-      roleIds[roleData.name] = result.insertedId as mongoose.Types.ObjectId;
     }
   }
-
-  return roleIds;
 }
 
 async function seedUser(
   db: mongoose.mongo.Db,
   userData: { firstName: string; lastName: string; email: string; password: string; emailVerified?: boolean },
-  roleId: mongoose.Types.ObjectId,
   roleName: string
 ) {
   const collection = db.collection("users");
@@ -118,7 +111,7 @@ async function seedUser(
     lastName: userData.lastName.trim(),
     email: normalizedEmail,
     password: hashedPassword,
-    role: roleId,
+    role: roleName,
     emailVerified: userData.emailVerified ?? false,
     emailVerifiedAt: userData.emailVerified ? now : null,
     createdAt: now,
@@ -132,16 +125,16 @@ async function seedUser(
   return result.insertedId;
 }
 
-async function seedAdminUser(db: mongoose.mongo.Db, roleIds: Record<string, mongoose.Types.ObjectId>) {
+async function seedAdminUser(db: mongoose.mongo.Db) {
   log.header("Seeding Admin User");
-  await seedUser(db, INITIAL_ADMIN, roleIds["admin"], "admin");
+  await seedUser(db, INITIAL_ADMIN, "admin");
 }
 
-async function seedExtraUsers(db: mongoose.mongo.Db, roleIds: Record<string, mongoose.Types.ObjectId>) {
+async function seedExtraUsers(db: mongoose.mongo.Db) {
   if (EXTRA_USERS.length === 0) return;
   log.header("Seeding Extra Users");
   for (const u of EXTRA_USERS) {
-    await seedUser(db, u, roleIds["user"], "user");
+    await seedUser(db, u, "user");
   }
 }
 
@@ -156,18 +149,13 @@ async function showSummary(db: mongoose.mongo.Db) {
     .project({ firstName: 1, lastName: 1, email: 1, role: 1, emailVerified: 1 })
     .toArray();
 
-  const adminRole = await db.collection("roles").findOne({ name: "admin" });
-  const userRole  = await db.collection("roles").findOne({ name: "user" });
-
   log.header("Database Summary");
   console.log(`  Roles  (${rolesCount})`);
   roles.forEach((r: any) => console.log(`    • ${r.name.padEnd(8)} — ${r.description}`));
 
   console.log(`\n  Users  (${usersCount})`);
   users.forEach((u: any) => {
-    const roleName = u.role?.toString() === adminRole?._id?.toString() ? "admin"
-                   : u.role?.toString() === userRole?._id?.toString() ? "user"
-                   : "unknown";
+    const roleName = u.role || "user"; // Role is stored as string
     const verified = u.emailVerified ? "✓ verified" : "✗ unverified";
     console.log(`    • ${u.email.padEnd(36)} role: ${roleName.padEnd(8)} ${verified}`);
   });
@@ -187,9 +175,9 @@ async function main() {
 
   const db = mongoose.connection.db!;
 
-  const roleIds = await seedRoles(db);
-  await seedAdminUser(db, roleIds);
-  await seedExtraUsers(db, roleIds);
+  await seedRoles(db);
+  await seedAdminUser(db);
+  await seedExtraUsers(db);
   await showSummary(db);
 
   await mongoose.disconnect();

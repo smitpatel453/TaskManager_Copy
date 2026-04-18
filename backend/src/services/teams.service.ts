@@ -20,15 +20,10 @@ export class TeamsService {
 
     private async isUserAdmin(userId: string): Promise<boolean> {
         const user = await this.userModel.findById(userId);
-        if (!user?.role) return false;
+        if (!user) return false;
 
-        const db = mongoose.connection.db;
-        if (!db) return false;
-
-        const adminRole = await db.collection("roles").findOne({ name: "admin" });
-        if (!adminRole) return false;
-
-        return user.role.toString() === adminRole._id.toString();
+        // Role is stored as string in user model
+        return user.role === "admin";
     }
 
     private async validateUsers(userIds: string[]): Promise<void> {

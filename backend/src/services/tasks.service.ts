@@ -259,23 +259,16 @@ export class TasksService {
    */
   private async isUserAdmin(userId: string): Promise<boolean> {
     try {
-      if (!mongoose.Types.ObjectId.isValid(userId)) { return false; }
+      if (!mongoose.Types.ObjectId.isValid(userId)) return false;
+      
       const db = mongoose.connection.db;
-      if (!db) {
-        return false;
-      }
+      if (!db) return false;
 
       const user = await db.collection("users").findOne({ _id: new mongoose.Types.ObjectId(userId) });
-      if (!user || !user.role) {
-        return false;
-      }
+      if (!user) return false;
 
-      const adminRole = await db.collection("roles").findOne({ name: "admin" });
-      if (!adminRole) {
-        return false;
-      }
-
-      return user.role.toString() === adminRole._id.toString();
+      // Role is stored as string in user model
+      return user.role === "admin";
     } catch (error) {
       console.error("Error checking admin status:", error);
       return false;

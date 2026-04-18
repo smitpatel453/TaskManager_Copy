@@ -35,14 +35,8 @@ async function adminMiddleware(req: Request, res: Response, next: NextFunction):
             return;
         }
 
-        // Check if user has admin role
-        if (!user.role) {
-            res.status(403).json({ error: "Admin access required" });
-            return;
-        }
-
-        const adminRole = await db.collection("roles").findOne({ name: "admin" });
-        if (!adminRole || user.role.toString() !== adminRole._id.toString()) {
+        // Check if user has admin role (role is stored as string in user model)
+        if (user.role !== "admin") {
             res.status(403).json({ error: "Admin access required" });
             return;
         }

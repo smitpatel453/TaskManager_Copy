@@ -22,21 +22,12 @@ export class UsersService {
     private async isUserAdmin(userId: string): Promise<boolean> {
         try {
             const user = await this.userModel.findById(userId);
-            if (!user || !user.role) {
+            if (!user) {
                 return false;
             }
 
-            const db = mongoose.connection.db;
-            if (!db) {
-                return false;
-            }
-
-            const adminRole = await db.collection("roles").findOne({ name: "admin" });
-            if (!adminRole) {
-                return false;
-            }
-
-            return user.role.toString() === adminRole._id.toString();
+            // Role is stored as string in user model
+            return user.role === "admin";
         } catch (error) {
             console.error("Error checking admin status:", error);
             return false;
@@ -44,17 +35,15 @@ export class UsersService {
     }
 
     /**
-     * Get role ObjectId by role name
+     * Get role name (role is stored as string in user model)
      */
-    private async getRoleIdByName(roleName: "admin" | "user"): Promise<mongoose.Types.ObjectId | undefined> {
+    private async getRoleIdByName(roleName: "admin" | "user"): Promise<string | undefined> {
         try {
-            const db = mongoose.connection.db;
-            if (!db) {
-                return undefined;
+            // Validate role name (role is stored as string in user model)
+            if (roleName === "admin" || roleName === "user") {
+                return roleName;
             }
-
-            const role = await db.collection("roles").findOne({ name: roleName });
-            return role ? role._id : undefined;
+            return undefined;
         } catch (error) {
             console.error("Error getting role by name:", error);
             return undefined;
@@ -103,21 +92,21 @@ export class UsersService {
         // Hash password
         const hashedPassword = await bcrypt.hash(data.password, 10);
 
-        // Get role ID
+        // Get and validate role
         const requestedRole = data.role || "user";
-        const roleId = await this.getRoleIdByName(requestedRole);
+        const roleString = await this.getRoleIdByName(requestedRole);
 
-        if (!roleId) {
-            throw new BadRequestError(`Role '${requestedRole}' not found in database`);
+        if (!roleString) {
+            throw new BadRequestError(`Role '${requestedRole}' is invalid. Must be 'admin' or 'user'`);
         }
 
-        // Create user
+        // Create user (role is stored as string)
         const userData = {
             firstName: data.firstName.trim(),
             lastName: data.lastName.trim(),
             email: data.email.trim().toLowerCase(),
             password: hashedPassword,
-            role: roleId,
+            role: roleString as "admin" | "user",
         };
 
         const result = await this.userModel.create(userData);
@@ -168,9 +157,6 @@ export class UsersService {
         const skip = (page - 1) * limit;
 
         // Get admin role ID
-        const adminRole = await db.collection("roles").findOne({ name: "admin" });
-        const userRole = await db.collection("roles").findOne({ name: "user" });
-
         const [users, total] = await Promise.all([
             db.collection("users")
                 .find({})
@@ -183,12 +169,8 @@ export class UsersService {
         ]);
 
         const usersWithRoles = users.map((user) => {
-            let roleName: "admin" | "user" = "user";
-            if (user.role && adminRole && user.role.toString() === adminRole._id.toString()) {
-                roleName = "admin";
-            } else if (user.role && userRole && user.role.toString() === userRole._id.toString()) {
-                roleName = "user";
-            }
+            // Role is stored as string ("admin" or "user")
+            const roleName = user.role || "user";
 
             return {
                 _id: user._id.toString(),
