@@ -34,22 +34,8 @@ export class AuthService {
     // Generate JWT token
     const token = await generateToken(user._id!.toString(), user.email);
 
-    // Determine user role
-    let userRole: "admin" | "user" = "user";
-    
-    if (user.role) {
-      try {
-        const db = mongoose.connection.db;
-        if (db) {
-          const adminRole = await db.collection("roles").findOne({ name: "admin" });
-          if (adminRole && user.role.toString() === adminRole._id.toString()) {
-            userRole = "admin";
-          }
-        }
-      } catch (error) {
-        console.error("Error checking admin role:", error);
-      }
-    }
+    // Determine user role (now stored as string in user schema)
+    const userRole: "admin" | "user" = (user.role === "admin") ? "admin" : "user";
 
     return {
       success: true,
