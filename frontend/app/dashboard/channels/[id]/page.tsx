@@ -1176,8 +1176,8 @@ export default function ChannelPage() {
 
                             {/* Message Actions Button */}
                             <button
-                              // onClick={() => setActiveActionMenuId(activeActionMenuId === msgId ? null : msgId)}
-                              onClick={() => setActiveActionMenuId(activeActionMenuId === firstMsg._id ? null : (firstMsg._id ?? ""))}
+                              onClick={() => setActiveActionMenuId(activeActionMenuId === msgId ? null : msgId)}
+                              // onClick={() => setActiveActionMenuId(activeActionMenuId === firstMsg._id ? null : (firstMsg._id ?? ""))}
 
                               className={`
                                 absolute ${group.isMe ? "right-full mr-2" : "left-full ml-2"}
