@@ -6,6 +6,7 @@ const allowedOrigins: string[] = [
   "http://192.168.1.6:3000",
   "https://oomtaskmanager.vercel.app",
   "https://taskmanager2-sigma.vercel.app",
+  "https://taskmanagerplatform.vercel.app",
   ...(ENV.FRONTEND_URL ? [ENV.FRONTEND_URL] : []),
 ];
 
