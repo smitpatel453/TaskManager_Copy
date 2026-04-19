@@ -285,7 +285,8 @@ export class TasksService {
     const isAdmin = await this.isUserAdmin(userId);
 
     const details = await this.taskModel.getDetails(rawId, userId, isAdmin);
-    return { ok: true, details };
+    const comments = await this.taskModel.getComments(rawId);
+    return { ok: true, details, comments };
   }
 
   async updateTaskDetail(taskId: string, detailIndex: number, updatedDetail: { text: string; time: string }, userId: string): Promise<any> {
@@ -499,5 +500,142 @@ export class TasksService {
       success: true,
       message: "Task deleted successfully",
     };
+  }
+
+  /**
+   * Add a comment to a task and notify the task creator/assigner
+   * Also detects @mentions and creates mention notifications
+   */
+  async addComment(taskId: string, userId: string, userName: string, message: string): Promise<any> {
+    if (!taskId || !mongoose.Types.ObjectId.isValid(taskId)) {
+      throw new Error("Invalid task ID");
+    }
+
+    if (!message || typeof message !== "string" || !message.trim()) {
+      throw new Error("Comment message is required");
+    }
+
+    // Check if user is admin
+    const isAdmin = await this.isUserAdmin(userId);
+
+    // Get the task to find who to notify
+    const task = await this.taskModel.findById(taskId, userId, isAdmin);
+    if (!task) {
+      throw new Error("Task not found");
+    }
+
+    // Add comment to task
+    const updatedTask = await this.taskModel.addComment(taskId, userId, userName, message);
+
+    // Notify the task creator or task assigner (existing comment_reply logic)
+    const notifyUserId = task.assignedTo?.toString() === userId 
+      ? task.userId // Notify creator if assigned user commented
+      : task.assignedTo; // Notify assignee if creator commented
+
+    if (notifyUserId && notifyUserId.toString() !== userId) {
+      await this.inboxService.notifyTaskComment(
+        taskId.toString(),
+        task.taskName,
+        userId,
+        userName,
+        message,
+        notifyUserId.toString()
+      );
+    }
+
+    // Extract mentions from comment message (@username)
+    const mentionRegex = /@(\w+)/g;
+    let match;
+    const mentionedUsernames = new Set<string>();
+    
+    while ((match = mentionRegex.exec(message)) !== null) {
+      mentionedUsernames.add(match[1]);
+    }
+
+    // Create mention notifications for each mentioned user
+    if (mentionedUsernames.size > 0) {
+      await this.notifyMentions(
+        taskId.toString(),
+        task.taskName,
+        userId,
+        userName,
+        Array.from(mentionedUsernames),
+        message
+      );
+    }
+
+    return {
+      success: true,
+      comment: updatedTask?.comments?.[updatedTask.comments.length - 1] || null
+    };
+  }
+
+  /**
+   * Helper method to notify mentioned users
+   * Finds users by first/last name and creates mention notifications
+   */
+  private async notifyMentions(
+    taskId: string,
+    taskName: string,
+    mentionerUserId: string,
+    mentionerName: string,
+    mentionedUsernames: string[],
+    commentMessage: string
+  ): Promise<void> {
+    try {
+      const db = mongoose.connection.db;
+      if (!db) {
+        console.warn("Database connection failed, cannot notify mentions");
+        return;
+      }
+
+      // Track which users have been notified (avoid duplicates)
+      const notifiedUserIds = new Set<string>();
+
+      // For each mentioned username, find and notify the user
+      for (const username of mentionedUsernames) {
+        try {
+          // Search for user by firstName or lastName (case-insensitive)
+          const mentionedUser = await db.collection("users").findOne({
+            $or: [
+              { firstName: { $regex: `^${username}$`, $options: "i" } },
+              { lastName: { $regex: `^${username}$`, $options: "i" } }
+            ]
+          });
+
+          if (!mentionedUser) {
+            console.debug(`User not found for mention: @${username}`);
+            continue;
+          }
+
+          // Don't notify the comment author (they mentioned themselves)
+          if (mentionedUser._id.toString() === mentionerUserId) {
+            continue;
+          }
+
+          // Skip if already notified (avoid duplicates)
+          if (notifiedUserIds.has(mentionedUser._id.toString())) {
+            continue;
+          }
+
+          // Create mention notification
+          await this.inboxService.createMentionNotification(
+            mentionedUser._id.toString(),
+            taskId,
+            taskName,
+            mentionerName,
+            mentionerUserId
+          );
+
+          notifiedUserIds.add(mentionedUser._id.toString());
+        } catch (error) {
+          console.error(`Error processing mention @${username}:`, error);
+          // Continue to next mention on error
+        }
+      }
+    } catch (error) {
+      console.error("Error notifying mentions:", error);
+      // Don't throw - we don't want to fail comment creation if mention notifications fail
+    }
   }
 }

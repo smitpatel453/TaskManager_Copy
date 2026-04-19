@@ -21,8 +21,9 @@ export class InboxController {
 
       const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
       const skip = parseInt(req.query.skip as string) || 0;
+      const type = (req.query.type as string) || "all"; // 'all', 'tasks', 'mention', 'comment_reply'
 
-      const result = await this.inboxService.getInboxMessages(userId, limit, skip);
+      const result = await this.inboxService.getInboxMessages(userId, limit, skip, type);
       res.json(result);
     } catch (error) {
       console.error("Error fetching inbox messages:", error);
@@ -129,6 +130,78 @@ export class InboxController {
     } catch (error) {
       console.error("Error fetching unread count:", error);
       res.status(500).json({ error: "Failed to fetch unread count" });
+    }
+  }
+
+  /**
+   * Add a reply to a notification
+   */
+  async addReply(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      const { messageId } = req.params;
+      const { message } = req.body;
+      if (!messageId || !message) {
+        res.status(400).json({ error: "messageId and message are required" });
+        return;
+      }
+
+      // Get sender name from user record
+      const userStr = req.user?.user;
+      const senderName = userStr ? userStr.firstName + " " + userStr.lastName : "User";
+
+      const result = await this.inboxService.addReplyToNotification(
+        messageId,
+        userId,
+        senderName,
+        message
+      );
+
+      res.json({ success: true, result });
+    } catch (error) {
+      console.error("Error adding reply:", error);
+      res.status(500).json({ error: "Failed to add reply" });
+    }
+  }
+
+  /**
+   * Create a mention notification
+   */
+  async createMention(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      const { mentionedUserId, taskId, taskName } = req.body;
+      if (!mentionedUserId || !taskId || !taskName) {
+        res.status(400).json({ error: "mentionedUserId, taskId, and taskName are required" });
+        return;
+      }
+
+      // Get mentioner name from user record
+      const userStr = req.user?.user;
+      const mentionerName = userStr ? userStr.firstName + " " + userStr.lastName : "Admin";
+
+      const notification = await this.inboxService.createMentionNotification(
+        mentionedUserId,
+        taskId,
+        taskName,
+        mentionerName,
+        userId
+      );
+
+      res.json({ success: true, notification });
+    } catch (error) {
+      console.error("Error creating mention:", error);
+      res.status(500).json({ error: "Failed to create mention" });
     }
   }
 }

@@ -5,6 +5,14 @@ export interface DetailBlock {
   time?: string; // HH:MM format
 }
 
+export interface TaskComment {
+  _id?: string;
+  userId: string;
+  userName: string;
+  message: string;
+  createdAt: string;
+}
+
 export type TaskStatus = "to-do" | "in-progress" | "completed";
 
 export interface Task {
@@ -55,5 +63,6 @@ export interface GetTasksResponse {
 export interface TaskDetailsResponse {
   ok: boolean;
   details: DetailBlock[];
+  comments?: TaskComment[];
   message?: string;
 }

@@ -19,6 +19,12 @@ router.patch("/:messageId/read", (req, res) => inboxController.markMessageAsRead
 // Mark all messages as read
 router.patch("/read/all", (req, res) => inboxController.markAllMessagesAsRead(req, res));
 
+// Add a reply to a notification
+router.post("/:messageId/reply", (req, res) => inboxController.addReply(req, res));
+
+// Create a mention notification
+router.post("/mention/create", (req, res) => inboxController.createMention(req, res));
+
 // Delete a message
 router.delete("/:messageId", (req, res) => inboxController.deleteMessage(req, res));
 

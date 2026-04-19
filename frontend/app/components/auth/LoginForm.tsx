@@ -89,6 +89,8 @@ export default function LoginForm() {
         localStorage.removeItem("user");
         setUser(null);
         setIsDropdownOpen(false);
+        // Dispatch custom event to trigger notification refresh on sign in
+        window.dispatchEvent(new CustomEvent("authChange"));
         window.dispatchEvent(new CustomEvent("authStateChanged", { detail: { isLoggedIn: false } }));
     };
 
@@ -199,6 +201,8 @@ export default function LoginForm() {
 
             localStorage.setItem("user", JSON.stringify(userData));
             setUser(userData);
+            // Dispatch custom event to trigger notification refresh
+            window.dispatchEvent(new CustomEvent("authChange"));
             window.dispatchEvent(new CustomEvent("authStateChanged", { detail: { isLoggedIn: true } }));
 
             closeModal();

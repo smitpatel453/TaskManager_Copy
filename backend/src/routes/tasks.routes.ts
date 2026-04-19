@@ -49,6 +49,7 @@ router.get("/", (req, res) => tasksController.getTasks(req, res));
 router.get("/:id/details", (req, res) => tasksController.getTaskDetails(req, res));
 router.put("/:id/details/:index", (req, res) => tasksController.updateTaskDetail(req, res));
 router.patch("/:id/status", (req, res) => tasksController.updateTaskStatus(req, res));
+router.post("/:id/comments", (req, res) => tasksController.addComment(req, res));
 router.patch("/:id", adminMiddleware, (req, res) => tasksController.updateTask(req, res));
 router.delete("/:id", adminMiddleware, (req, res) => tasksController.deleteTask(req, res));
 export default router;

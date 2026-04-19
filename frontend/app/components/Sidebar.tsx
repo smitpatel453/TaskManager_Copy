@@ -356,6 +356,8 @@ export default function Sidebar({ userRole }: SidebarProps) {
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    // Dispatch custom event to trigger notification refresh on sign in
+    window.dispatchEvent(new CustomEvent("authChange"));
     window.location.href = "/";
   };
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useNotifications } from '../hooks/useNotifications';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -12,31 +13,47 @@ interface NotificationToast {
 }
 
 export function NotificationToastContainer() {
-  const { notifications: allNotifications } = useNotifications();
+  const router = useRouter();
+  const { notifications: allNotifications, loading } = useNotifications();
   const [toasts, setToasts] = useState<NotificationToast[]>([]);
-  const [displayedNotificationIds, setDisplayedNotificationIds] = useState<Set<string>>(new Set());
+  const [lastSeenNotificationIds, setLastSeenNotificationIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    // Show toast for newly received notifications
-    allNotifications.forEach((notif) => {
-      if (!displayedNotificationIds.has(notif._id) && !notif.isRead) {
-        const newToast: NotificationToast = {
+    // Show toasts for all unread notifications that we haven't shown as a toast yet
+    const unreadNotifications = allNotifications.filter(notif => !notif.isRead);
+    
+    if (unreadNotifications.length > 0) {
+      // Only create toasts for notifications we haven't seen before
+      const newUnseenNotifications = unreadNotifications.filter(
+        notif => !lastSeenNotificationIds.has(notif._id)
+      );
+      
+      if (newUnseenNotifications.length > 0) {
+        const newToasts = newUnseenNotifications.map(notif => ({
           id: notif._id,
           title: notif.title,
           message: notif.message,
           type: notif.type,
-        };
-
-        setToasts((prev) => [...prev, newToast]);
-        setDisplayedNotificationIds((prev) => new Set(prev).add(notif._id));
-
-        // Auto-remove after 5 seconds
-        setTimeout(() => {
-          setToasts((prev) => prev.filter((t) => t.id !== notif._id));
-        }, 5000);
+        }));
+        
+        setToasts((prev) => [...prev, ...newToasts]);
+        
+        // Update the set of seen notifications
+        setLastSeenNotificationIds(prev => {
+          const updated = new Set(prev);
+          newUnseenNotifications.forEach(n => updated.add(n._id));
+          return updated;
+        });
+        
+        // Auto-hide each new toast after 5 seconds
+        newUnseenNotifications.forEach((notif) => {
+          setTimeout(() => {
+            setToasts((prev) => prev.filter((t) => t.id !== notif._id));
+          }, 5000);
+        });
       }
-    });
-  }, [allNotifications, displayedNotificationIds]);
+    }
+  }, [allNotifications, lastSeenNotificationIds]);
 
   return (
     <div className="fixed top-20 right-6 z-[9999] pointer-events-none max-w-[400px]">
@@ -50,7 +67,15 @@ export function NotificationToastContainer() {
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className="mb-3 pointer-events-auto"
           >
-            <div className="bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl p-4 shadow-lg backdrop-blur-sm">
+            <div 
+              onClick={() => {
+                // Navigate to inbox with notification ID to expand it
+                router.push(`/dashboard/inbox?expandNotification=${toast.id}`);
+                // Remove toast
+                setToasts((prev) => prev.filter((t) => t.id !== toast.id));
+              }}
+              className="bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl p-4 shadow-lg backdrop-blur-sm cursor-pointer hover:bg-[var(--bg-surface-2)] transition-colors"
+            >
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-[var(--accent)] mt-1.5 flex-shrink-0"></div>
                 <div className="flex-1">
@@ -62,7 +87,10 @@ export function NotificationToastContainer() {
                   </p>
                 </div>
                 <button
-                  onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setToasts((prev) => prev.filter((t) => t.id !== toast.id));
+                  }}
                   className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors flex-shrink-0 mt-0.5"
                 >
                   <i className="pi pi-times text-[12px]" />

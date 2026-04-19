@@ -1,18 +1,23 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { inboxApi, type InboxMessage } from "../../../src/api/inbox.api";
 
 
 export default function InboxClient() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
+  const [activeFilter, setActiveFilter] = useState<"all" | "tasks" | "mention" | "comment_reply">("all");
+  const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
   const queryClient = useQueryClient();
 
-  // Fetch inbox messages
+  // Fetch inbox messages with filter
   const { data: inboxData, isLoading } = useQuery({
-    queryKey: ["inbox-messages"],
-    queryFn: () => inboxApi.getMessages(100, 0),
+    queryKey: ["inbox-messages", activeFilter],
+    queryFn: () => inboxApi.getMessages(100, 0, activeFilter),
     staleTime: 30 * 1000, // Refresh every 30 seconds
   });
 
@@ -20,7 +25,7 @@ export default function InboxClient() {
   const markAsReadMutation = useMutation({
     mutationFn: (messageId: string) => inboxApi.markMessageAsRead(messageId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inbox-messages"] });
+      queryClient.invalidateQueries({ queryKey: ["inbox-messages", activeFilter] });
     },
   });
 
@@ -28,7 +33,7 @@ export default function InboxClient() {
   const markAllAsReadMutation = useMutation({
     mutationFn: () => inboxApi.markAllAsRead(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inbox-messages"] });
+      queryClient.invalidateQueries({ queryKey: ["inbox-messages", activeFilter] });
     },
   });
 
@@ -36,7 +41,17 @@ export default function InboxClient() {
   const deleteMessageMutation = useMutation({
     mutationFn: (messageId: string) => inboxApi.deleteMessage(messageId),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inbox-messages", activeFilter] });
+    },
+  });
+
+  // Add reply mutation
+  const addReplyMutation = useMutation({
+    mutationFn: (data: { messageId: string; message: string }) => inboxApi.addReply(data.messageId, data.message),
+    onSuccess: () => {
+      // Invalidate all inbox queries (all filters) since replies can appear in multiple tabs
       queryClient.invalidateQueries({ queryKey: ["inbox-messages"] });
+      setReplyText({});
     },
   });
 
@@ -62,6 +77,10 @@ export default function InboxClient() {
         return "📌";
       case "task-status-changed":
         return "✅";
+      case "mention":
+        return "@";
+      case "comment_reply":
+        return "💬";
       default:
         return "📧";
     }
@@ -80,6 +99,33 @@ export default function InboxClient() {
     }
     setExpandedMessages(newExpanded);
   };
+
+  const handleNavigateToTask = (message: InboxMessage) => {
+    // Navigate to task page with filter and task ID
+    const taskId = message.taskId || "";
+    const taskName = message.taskName || "";
+    router.push(`/dashboard/tasks?filter=assigned&taskId=${taskId}&scrollTo=${taskName}`);
+  };
+
+  // Auto-expand notification from query parameter (when clicked from toast)
+  useEffect(() => {
+    const expandNotificationId = searchParams.get("expandNotification");
+    if (expandNotificationId && messages.length > 0) {
+      const notification = messages.find(m => m._id === expandNotificationId);
+      if (notification) {
+        // Expand the notification
+        setExpandedMessages(new Set([expandNotificationId]));
+
+        // Scroll to the notification after a short delay
+        setTimeout(() => {
+          const element = document.getElementById(`notification-${expandNotificationId}`);
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }, 300);
+      }
+    }
+  }, [searchParams, messages]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -109,7 +155,7 @@ export default function InboxClient() {
     <div className="flex flex-col h-full bg-[var(--bg-canvas)]">
       {/* Inbox Header */}
       <div className="border-b border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-lg font-semibold text-[var(--text-primary)]">Inbox</h1>
             <p className="text-sm text-[var(--text-muted)] mt-1">
@@ -126,6 +172,26 @@ export default function InboxClient() {
             </button>
           )}
         </div>
+
+        {/* Filter Tabs */}
+        <div className="flex items-center gap-2 overflow-x-auto border-b border-[var(--border-subtle)]">
+          {(["all", "tasks", "mention", "comment_reply"] as const).map((filter) => (
+            <button
+              key={filter}
+              onClick={() => setActiveFilter(filter)}
+              className={`pb-3 px-3 text-[12px] sm:text-[13px] font-medium border-b-2 transition-colors whitespace-nowrap ${
+                activeFilter === filter
+                  ? "border-[var(--accent)] text-[var(--accent)]"
+                  : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              {filter === "all" && "All"}
+              {filter === "tasks" && "Tasks"}
+              {filter === "mention" && "Mentions"}
+              {filter === "comment_reply" && "Replies"}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Messages List */}
@@ -133,8 +199,18 @@ export default function InboxClient() {
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-[var(--text-muted)]">
             <i className="pi pi-envelope text-5xl mb-3 opacity-50" />
-            <p className="text-base">No messages yet</p>
-            <p className="text-sm">You will receive notifications about assigned tasks and status updates here.</p>
+            <p className="text-base">
+              {activeFilter === "all" && "No messages yet"}
+              {activeFilter === "tasks" && "No task notifications"}
+              {activeFilter === "mention" && "No mentions"}
+              {activeFilter === "comment_reply" && "No replies"}
+            </p>
+            <p className="text-sm">
+              {activeFilter === "all" && "You will receive notifications about assigned tasks and status updates here."}
+              {activeFilter === "tasks" && "Task assignments and status updates will appear here."}
+              {activeFilter === "mention" && "When someone mentions you, you'll see it here."}
+              {activeFilter === "comment_reply" && "When someone replies to a task comment, you'll see it here."}
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-[var(--border-default)]">
@@ -144,6 +220,7 @@ export default function InboxClient() {
 
               return (
                 <div
+                  id={`notification-${message._id}`}
                   key={message._id}
                   className={`border-l-4 transition-colors ${
                     isUnread ? "border-l-blue-500 bg-blue-500/5" : "border-l-transparent bg-[var(--bg-canvas)]"
@@ -236,7 +313,7 @@ export default function InboxClient() {
 
                         {/* Action buttons */}
                         <div className="flex gap-2 pt-2">
-                          {isUnread && (
+                          {activeFilter !== "all" && isUnread && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -249,18 +326,83 @@ export default function InboxClient() {
                               Mark as read
                             </button>
                           )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteMessageMutation.mutate(message._id);
-                            }}
-                            disabled={deleteMessageMutation.isPending}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-600 hover:bg-red-500/20 text-xs font-medium transition-colors disabled:opacity-50"
-                          >
-                            <i className="pi pi-trash" />
-                            Delete
-                          </button>
+                          {activeFilter !== "all" && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteMessageMutation.mutate(message._id);
+                              }}
+                              disabled={deleteMessageMutation.isPending}
+                              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-600 hover:bg-red-500/20 text-xs font-medium transition-colors disabled:opacity-50"
+                            >
+                              <i className="pi pi-trash" />
+                              Delete
+                            </button>
+                          )}
+                          {(message.type === "task-assigned" || message.type === "task-status-changed") && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleNavigateToTask(message);
+                              }}
+                              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 text-xs font-medium transition-colors"
+                            >
+                              <i className="pi pi-arrow-right" />
+                              View Task
+                            </button>
+                          )}
                         </div>
+
+                        {/* Replies Section - Only for comment replies, not in "all" section or mentions */}
+                        {activeFilter !== "all" && message.type === "comment_reply" && message.replies && message.replies.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
+                            <h4 className="text-xs font-semibold text-[var(--text-muted)] uppercase mb-3">Replies ({message.replies.length})</h4>
+                            <div className="space-y-2">
+                              {message.replies.map((reply, idx) => (
+                                <div key={idx} className="bg-[var(--bg-surface-2)] rounded-lg p-3 text-sm">
+                                  <div className="flex items-start justify-between gap-2 mb-1">
+                                    <strong className="text-[var(--text-primary)] text-xs">{reply.senderName}</strong>
+                                    <span className="text-xs text-[var(--text-muted)]">{formatDate(reply.createdAt)}</span>
+                                  </div>
+                                  <p className="text-[var(--text-secondary)] text-xs">{reply.message}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Reply Input - Only for comment replies, not in "all" section or mentions */}
+                        {activeFilter !== "all" && message.type === "comment_reply" && (
+                          <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]" onClick={(e) => e.stopPropagation()}>
+                            <form onSubmit={(e) => {
+                              e.preventDefault();
+                              if (replyText[message._id]?.trim()) {
+                                addReplyMutation.mutate({
+                                  messageId: message._id,
+                                  message: replyText[message._id]
+                                });
+                              }
+                            }} className="flex gap-2">
+                              <input
+                                type="text"
+                                value={replyText[message._id] || ""}
+                                onChange={(e) => setReplyText({...replyText, [message._id]: e.target.value})}
+                                placeholder="Add a reply..."
+                                disabled={addReplyMutation.isPending}
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex-1 px-3 py-1.5 bg-[var(--bg-surface-2)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] disabled:opacity-50"
+                              />
+                              <button
+                                type="submit"
+                                disabled={addReplyMutation.isPending || !replyText[message._id]?.trim()}
+                                onClick={(e) => e.stopPropagation()}
+                                className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                              >
+                                {addReplyMutation.isPending ? "Sending..." : "Reply"}
+                              </button>
+                            </form>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

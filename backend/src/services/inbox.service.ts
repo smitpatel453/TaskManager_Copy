@@ -176,15 +176,16 @@ export class InboxService {
     }
 
     /**
-     * Get inbox messages for a user
+     * Get inbox messages for a user with optional type filtering
      */
     async getInboxMessages(
         recipientId: string,
         limit: number = 50,
-        skip: number = 0
+        skip: number = 0,
+        type?: string
     ): Promise<any> {
-        const messages = await this.inboxModel.findByRecipientId(recipientId, limit, skip);
-        const total = await this.inboxModel.countByRecipientId(recipientId);
+        const messages = await this.inboxModel.findByRecipientId(recipientId, limit, skip, type);
+        const total = await this.inboxModel.countByRecipientId(recipientId, type);
         const unreadCount = await this.inboxModel.countUnreadByRecipientId(recipientId);
 
         return {
@@ -193,6 +194,7 @@ export class InboxService {
             unreadCount,
             skip,
             limit,
+            filter: type || "all",
         };
     }
 
@@ -234,5 +236,151 @@ export class InboxService {
     private formatStatus(status: TaskStatusNotificationType): string {
         if (status === "in-progress") return "In Progress";
         return status.charAt(0).toUpperCase() + status.slice(1);
+    }
+
+    /**
+     * Add a reply to a notification
+     */
+    async addReplyToNotification(
+        messageId: string,
+        senderId: string,
+        senderName: string,
+        replyMessage: string
+    ): Promise<any> {
+        try {
+            // Add reply to original notification
+            const updatedMessage = await this.inboxModel.addReply(messageId, senderId, senderName, replyMessage);
+            
+            // Get the original notification to get the sender (to notify them)
+            const originalNotification = await this.inboxModel.findById(messageId);
+            
+            if (originalNotification && originalNotification.senderId) {
+                // Create a notification for the original sender showing the reply
+                const replyNotification = await this.inboxModel.create({
+                    recipientId: originalNotification.senderId,
+                    senderId: new mongoose.Types.ObjectId(senderId),
+                    taskId: originalNotification.taskId,
+                    taskName: originalNotification.taskName,
+                    type: "comment_reply",
+                    title: `${senderName} replied`,
+                    message: `${senderName} replied: ${replyMessage}`,
+                    isRead: false,
+                    createdAt: new Date(),
+                    replies: [{
+                        senderId: new mongoose.Types.ObjectId(senderId),
+                        senderName,
+                        message: replyMessage,
+                        createdAt: new Date()
+                    }]
+                });
+                
+                // Emit socket event for real-time update to the original sender
+                emitNotification(originalNotification.senderId.toString(), {
+                    _id: replyNotification._id.toString(),
+                    title: replyNotification.title,
+                    message: replyNotification.message,
+                    type: replyNotification.type,
+                    taskName: replyNotification.taskName,
+                    taskId: replyNotification.taskId?.toString(),
+                    senderId: replyNotification.senderId?.toString(),
+                    createdAt: replyNotification.createdAt,
+                });
+            }
+            
+            // Emit socket event for real-time update to the replier
+            emitNotification("notification_reply", {
+                messageId,
+                reply: {
+                    senderId,
+                    senderName,
+                    message: replyMessage,
+                    createdAt: new Date()
+                }
+            });
+
+            return { ok: true, message: updatedMessage };
+        } catch (error) {
+            console.error("Error adding reply:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * Create a mention notification
+     */
+    async createMentionNotification(
+        mentionedUserId: string,
+        taskId: string,
+        taskName: string,
+        mentionerName: string,
+        mentionerUserId: string
+    ): Promise<any> {
+        try {
+            const notification = await this.inboxModel.createMentionNotification(
+                mentionedUserId,
+                taskId,
+                taskName,
+                mentionerName,
+                mentionerUserId
+            );
+
+            // Emit socket event for real-time notification to the mentioned user
+            emitNotification(mentionedUserId, {
+                _id: notification._id.toString(),
+                title: notification.title,
+                message: notification.message,
+                type: notification.type,
+                taskName: notification.taskName,
+                taskId: notification.taskId?.toString(),
+                senderId: notification.senderId?.toString(),
+                createdAt: notification.createdAt,
+            });
+
+            return notification;
+        } catch (error) {
+            console.error("Error creating mention notification:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * Notify about a task comment
+     */
+    async notifyTaskComment(
+        taskId: string,
+        taskName: string,
+        commenterId: string,
+        commenterName: string,
+        commentMessage: string,
+        notifyUserId: string
+    ): Promise<void> {
+        try {
+            const notification = await this.inboxModel.create({
+                recipientId: new mongoose.Types.ObjectId(notifyUserId),
+                senderId: new mongoose.Types.ObjectId(commenterId),
+                taskId: new mongoose.Types.ObjectId(taskId),
+                taskName,
+                type: "comment_reply",
+                title: `${commenterName} commented`,
+                message: `${commenterName} commented: ${commentMessage}`,
+                isRead: false,
+                createdAt: new Date(),
+            });
+
+            // Emit socket event for real-time notification
+            emitNotification(notifyUserId, {
+                _id: notification._id.toString(),
+                title: notification.title,
+                message: notification.message,
+                type: notification.type,
+                taskName: notification.taskName,
+                taskId: notification.taskId?.toString(),
+                senderId: notification.senderId?.toString(),
+                createdAt: notification.createdAt,
+            });
+        } catch (error) {
+            console.error("Error notifying task comment:", error);
+            // Don't throw - we don't want to fail task update if notification fails
+        }
     }
 }

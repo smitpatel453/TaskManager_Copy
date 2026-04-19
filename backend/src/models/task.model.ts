@@ -17,6 +17,13 @@ export interface TaskDocument extends Document {
     assignedTo?: mongoose.Types.ObjectId;
     startDate?: Date;
     dueDate?: Date;
+    comments?: {
+        _id?: mongoose.Types.ObjectId;
+        userId: mongoose.Types.ObjectId;
+        userName: string;
+        message: string;
+        createdAt: Date;
+    }[];
     createdAt: Date;
 }
 
@@ -45,6 +52,16 @@ const detailBlockSchema = new Schema<DetailBlock>(
     { _id: false }
 );
 
+const commentSchema = new Schema(
+    {
+        userId: { type: Schema.Types.ObjectId, ref: "users", required: true },
+        userName: { type: String, required: true },
+        message: { type: String, required: true },
+        createdAt: { type: Date, default: Date.now }
+    },
+    { _id: true }
+);
+
 const taskSchema = new Schema<TaskDocument>(
     {
         userId: { type: Schema.Types.ObjectId, ref: "users", required: true, index: true },
@@ -65,6 +82,7 @@ const taskSchema = new Schema<TaskDocument>(
         assignedTo: { type: Schema.Types.ObjectId, ref: "users", index: true },
         startDate: { type: Date },
         dueDate: { type: Date },
+        comments: { type: [commentSchema], default: [] },
     },
     {
         timestamps: true,
@@ -278,20 +296,22 @@ export class TaskModel {
             return null;
         }
 
+        const objectId = new mongoose.Types.ObjectId(id);
+
         if (isAdmin) {
             // Admins can access any task
-            return this.model.findOne({ _id: id });
+            return this.model.findOne({ _id: objectId }).exec();
         }
 
         // Regular users can only access tasks they created or are assigned to
         const userObjectId = new mongoose.Types.ObjectId(userId);
         return this.model.findOne({
-            _id: id,
+            _id: objectId,
             $or: [
                 { userId: userObjectId },
                 { assignedTo: userObjectId }
             ]
-        });
+        }).exec();
     }
 
     async findBySequenceNumber(no: number, userId: string, isAdmin: boolean = false): Promise<TaskDocument | null> {
@@ -408,5 +428,41 @@ export class TaskModel {
         task.details[detailIndex] = updatedDetail;
         await task.save();
         return task;
+    }
+
+    /**
+     * Add a comment to a task
+     */
+    async addComment(taskId: string, userId: string, userName: string, message: string): Promise<TaskDocument | null> {
+        if (!mongoose.Types.ObjectId.isValid(taskId)) {
+            return null;
+        }
+
+        return this.model.findByIdAndUpdate(
+            new mongoose.Types.ObjectId(taskId),
+            {
+                $push: {
+                    comments: {
+                        userId: new mongoose.Types.ObjectId(userId),
+                        userName,
+                        message,
+                        createdAt: new Date()
+                    }
+                }
+            },
+            { new: true }
+        ).exec();
+    }
+
+    /**
+     * Get all comments for a task
+     */
+    async getComments(taskId: string): Promise<any[]> {
+        if (!mongoose.Types.ObjectId.isValid(taskId)) {
+            return [];
+        }
+
+        const task = await this.model.findById(taskId).select("comments");
+        return task?.comments || [];
     }
 }

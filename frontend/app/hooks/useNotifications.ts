@@ -9,11 +9,6 @@ export function useNotifications() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Load initial notifications
-  useEffect(() => {
-    loadNotifications();
-  }, []);
-
   const loadNotifications = useCallback(async () => {
     try {
       // Check if user is authenticated (token exists)
@@ -40,6 +35,29 @@ export function useNotifications() {
       setLoading(false);
     }
   }, []);
+
+  // Load initial notifications and listen for auth changes
+  useEffect(() => {
+    loadNotifications();
+    
+    // Listen for storage changes (token updates on same tab)
+    const handleStorageChange = () => {
+      loadNotifications();
+    };
+    
+    // Listen for custom auth events
+    const handleAuthChange = () => {
+      loadNotifications();
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('authChange', handleAuthChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('authChange', handleAuthChange);
+    };
+  }, [loadNotifications]);
 
   // Listen for real-time notifications
   useEffect(() => {

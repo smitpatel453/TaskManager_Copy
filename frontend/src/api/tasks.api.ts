@@ -43,4 +43,10 @@ export const tasksApi = {
     const response = await api.delete(`/tasks/${taskId}`);
     return response.data;
   },
+
+  // Add comment to task
+  addComment: async (taskId: string, message: string) => {
+    const response = await api.post(`/tasks/${taskId}/comments`, { message });
+    return response.data;
+  },
 };

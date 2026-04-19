@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { TasksService } from "../services/tasks.service.js";
+import mongoose from "mongoose";
 import type { CreateTaskRequest } from "../shared/types/index.js";
 
 export class TasksController {
@@ -229,6 +230,53 @@ export class TasksController {
           res.status(404).json({ error: error.message });
         } else if (error.message.includes("admin") || error.message.includes("Access")) {
           res.status(403).json({ error: error.message });
+        } else {
+          res.status(400).json({ error: error.message });
+        }
+      } else {
+        res.status(500).json({ error: "Server error" });
+      }
+    }
+  }
+
+  async addComment(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      const { id } = req.params;
+      const { message } = req.body;
+
+      if (!message || typeof message !== "string" || !message.trim()) {
+        res.status(400).json({ error: "Comment message is required" });
+        return;
+      }
+
+      // Fetch user from database to get firstName and lastName
+      const db = mongoose.connection.db;
+      if (!db) {
+        res.status(500).json({ error: "Database connection failed" });
+        return;
+      }
+
+      const user = await db.collection("users").findOne({ _id: new mongoose.Types.ObjectId(userId) });
+      
+      const userName = user 
+        ? (user.firstName && user.lastName) 
+          ? `${user.firstName} ${user.lastName}`
+          : user.firstName || user.lastName || "User"
+        : "User";
+
+      const result = await this.tasksService.addComment(id, userId, userName, message);
+      res.json(result);
+    } catch (error) {
+      console.error("Add comment error:", error);
+      if (error instanceof Error) {
+        if (error.message.includes("not found") || error.message.includes("Invalid")) {
+          res.status(404).json({ error: error.message });
         } else {
           res.status(400).json({ error: error.message });
         }

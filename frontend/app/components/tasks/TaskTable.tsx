@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { tasksApi } from "../../../src/api/tasks.api";
 import { projectsApi } from "../../../src/api/projects.api";
@@ -80,10 +81,14 @@ const groupConfigs = {
 };
 
 export default function TaskTable({ initialFilter, projectFilter, assignedToFilter, readOnly = false, viewMode = "list" }: TaskTableProps) {
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   
   // Subscribe to real-time task updates
   useTaskUpdates();
+  
+  const scrollToTaskId = searchParams.get("taskId");
+  const scrollToTaskName = searchParams.get("scrollTo");
   
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
@@ -152,6 +157,25 @@ export default function TaskTable({ initialFilter, projectFilter, assignedToFilt
 
   const hasClientFilter = Boolean(projectFilter || assignedToFilter);
   const displayTotal = hasClientFilter ? filteredTasks.length : (data?.pagination?.totalItems || 0);
+
+  // Handle scroll to task from notification
+  useEffect(() => {
+    if (scrollToTaskId && filteredTasks.length > 0) {
+      const matchingTask = filteredTasks.find(t => t._id === scrollToTaskId);
+      if (matchingTask) {
+        // Expand the task
+        setExpandedTaskId(scrollToTaskId);
+        
+        // Scroll to the task after a short delay to ensure DOM has updated
+        setTimeout(() => {
+          const taskElement = document.getElementById(`task-row-${scrollToTaskId}`);
+          if (taskElement) {
+            taskElement.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }, 300);
+      }
+    }
+  }, [scrollToTaskId, filteredTasks]);
 
   // Click outside handler for custom dropdowns
   useEffect(() => {
@@ -1724,6 +1748,10 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId, formatDueDate, isDue
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
+  // Comment state
+  const [newComment, setNewComment] = useState("");
+  const [isPostingComment, setIsPostingComment] = useState(false);
+
   // Click-outside handler for status dropdown
   useEffect(() => {
     if (!statusDropdownOpen) return;
@@ -1746,6 +1774,7 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId, formatDueDate, isDue
   });
 
   const details = Array.isArray(data?.details) ? data.details : [];
+  const comments = Array.isArray(data?.comments) ? data.comments : [];
 
   const settingsTotalSubtaskHours = useMemo(() => {
     return details.reduce((acc: number, curr: TaskDetail) => {
@@ -1872,12 +1901,28 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId, formatDueDate, isDue
     }
   };
 
+  const handleAddComment = async () => {
+    if (!newComment.trim()) return;
+    setIsPostingComment(true);
+    try {
+      await tasksApi.addComment(task._id, newComment);
+      setNewComment("");
+      // Refresh task details to get new comment
+      queryClient.invalidateQueries({ queryKey: ["task-details", task._id] });
+    } catch (error: any) {
+      console.error("Failed to add comment:", error);
+    } finally {
+      setIsPostingComment(false);
+    }
+  };
+
   const overdue = isDueDateOverdue(task.dueDate) && task.status !== "completed";
   const dueDateStr = formatDueDate(task.dueDate);
 
   return (
     <>
       <div
+        id={`task-row-${task._id}`}
         draggable={enableDrag && updatingTaskId !== task._id}
         onDragStart={(e) => onTaskDragStart?.(e, task)}
         onDragEnd={() => onTaskDragEnd?.()}
@@ -2124,9 +2169,52 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId, formatDueDate, isDue
                   </div>
                 )}
               </div>
+
+              {/* Comments Section */}
+              <div className="border-t border-[var(--border-subtle)] pt-4 mt-4">
+                <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Comments ({comments.length})</h4>
+                
+                {/* Comments List */}
+                {comments.length === 0 ? (
+                  <div className="text-sm text-[var(--text-tertiary)] mb-4">No comments yet. Add one below!</div>
+                ) : (
+                  <div className="space-y-2 mb-4">
+                    {comments.map((comment: any, idx: number) => (
+                      <div key={idx} className="bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded-md p-3 text-sm">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <span className="font-semibold text-[var(--text-primary)] text-xs">{comment.userName}</span>
+                          <span className="text-xs text-[var(--text-muted)]">
+                            {new Date(comment.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                          </span>
+                        </div>
+                        <p className="text-[var(--text-secondary)]">{comment.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Comment Input */}
+                <div className="flex gap-2">
+                  <textarea
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="Add a comment..."
+                    disabled={isPostingComment}
+                    rows={2}
+                    className="flex-1 px-3 py-2 bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded-md text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 resize-none"
+                  />
+                </div>
+                <button
+                  onClick={handleAddComment}
+                  disabled={isPostingComment || !newComment.trim()}
+                  className="mt-2 px-4 py-1.5 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white text-sm font-medium rounded-md transition-colors w-full"
+                >
+                  {isPostingComment ? "Posting..." : "Add Comment"}
+                </button>
+              </div>
             </div>
 
-            {/* Right: Activity panel placeholder */}
+            {/* Right: Activity panel */}
             <div className="w-[280px] p-4 flex-shrink-0">
               <div className="flex items-center justify-between mb-4">
                 <h4 className="font-semibold text-sm text-[var(--text-primary)]">Activity</h4>

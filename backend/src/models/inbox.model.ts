@@ -1,6 +1,6 @@
-import mongoose, { Schema, Document, Model, Types } from "mongoose";
+import mongoose, { Schema, Document, Model } from "mongoose";
 
-export type NotificationType = "task-assigned" | "task-status-changed";
+export type NotificationType = "task-assigned" | "task-status-changed" | "mention" | "comment_reply";
 export type TaskStatusNotificationType = "to-do" | "in-progress" | "completed";
 
 export interface InboxMessageDocument extends Document {
@@ -15,6 +15,18 @@ export interface InboxMessageDocument extends Document {
     newStatus?: TaskStatusNotificationType; // For status change notifications
     isRead: boolean;
     createdAt: Date;
+    
+    // For replies/comments
+    replies?: {
+        _id?: mongoose.Types.ObjectId;
+        senderId: mongoose.Types.ObjectId;
+        senderName: string;
+        message: string;
+        createdAt: Date;
+    }[];
+    
+    // For mentions
+    mentionedUsers?: string[]; // IDs of mentioned users
 }
 
 const inboxSchema = new Schema<InboxMessageDocument>(
@@ -23,13 +35,24 @@ const inboxSchema = new Schema<InboxMessageDocument>(
         senderId: { type: Schema.Types.ObjectId, ref: "users" },
         taskId: { type: Schema.Types.ObjectId, ref: "tasks", required: true, index: true },
         taskName: { type: String, required: true },
-        type: { type: String, enum: ["task-assigned", "task-status-changed"], required: true },
+        type: { type: String, enum: ["task-assigned", "task-status-changed", "mention", "comment_reply"], required: true },
         title: { type: String, required: true },
         message: { type: String, required: true },
         previousStatus: { type: String, enum: ["to-do", "in-progress", "completed"] },
         newStatus: { type: String, enum: ["to-do", "in-progress", "completed"] },
         isRead: { type: Boolean, default: false, index: true },
         createdAt: { type: Date, default: Date.now, index: true },
+        
+        // Replies to notifications
+        replies: [{
+            senderId: { type: Schema.Types.ObjectId, ref: "users" },
+            senderName: { type: String },
+            message: { type: String },
+            createdAt: { type: Date, default: Date.now }
+        }],
+        
+        // Mentioned users
+        mentionedUsers: [{ type: Schema.Types.ObjectId, ref: "users" }]
     },
     {
         timestamps: false,
@@ -55,13 +78,29 @@ export class InboxModel {
         return message.save();
     }
 
-    async findByRecipientId(recipientId: string, limit: number = 50, skip: number = 0): Promise<InboxMessageDocument[]> {
+    async findByRecipientId(recipientId: string, limit: number = 50, skip: number = 0, type?: string): Promise<InboxMessageDocument[]> {
         if (!mongoose.Types.ObjectId.isValid(recipientId)) {
             throw new Error("Invalid recipient ID");
         }
 
+        const query: any = { recipientId: new mongoose.Types.ObjectId(recipientId) };
+        
+        // If type filter is provided, add it to query
+        if (type && type !== "all") {
+            if (type === "tasks") {
+                // Show ONLY task-assigned and task-status-changed
+                query.type = { $in: ["task-assigned", "task-status-changed"] };
+            } else if (type === "mention") {
+                // Show ONLY mentions
+                query.type = "mention";
+            } else if (type === "comment_reply") {
+                // Show ONLY comment replies
+                query.type = "comment_reply";
+            }
+        }
+
         return this.model
-            .find({ recipientId: new mongoose.Types.ObjectId(recipientId) })
+            .find(query)
             .sort({ createdAt: -1 })
             .limit(limit)
             .skip(skip)
@@ -69,12 +108,28 @@ export class InboxModel {
             .exec();
     }
 
-    async countByRecipientId(recipientId: string): Promise<number> {
+    async countByRecipientId(recipientId: string, type?: string): Promise<number> {
         if (!mongoose.Types.ObjectId.isValid(recipientId)) {
             throw new Error("Invalid recipient ID");
         }
 
-        return this.model.countDocuments({ recipientId: new mongoose.Types.ObjectId(recipientId) });
+        const query: any = { recipientId: new mongoose.Types.ObjectId(recipientId) };
+        
+        // If type filter is provided, add it to query
+        if (type && type !== "all") {
+            if (type === "tasks") {
+                // Count ONLY task-assigned and task-status-changed
+                query.type = { $in: ["task-assigned", "task-status-changed"] };
+            } else if (type === "mention") {
+                // Count ONLY mentions
+                query.type = "mention";
+            } else if (type === "comment_reply") {
+                // Count ONLY comment replies
+                query.type = "comment_reply";
+            }
+        }
+
+        return this.model.countDocuments(query);
     }
 
     async countUnreadByRecipientId(recipientId: string): Promise<number> {
@@ -139,5 +194,62 @@ export class InboxModel {
             recipientId: new mongoose.Types.ObjectId(recipientId),
             createdAt: { $lt: cutoffDate },
         });
+    }
+
+    /**
+     * Add a reply to a notification
+     */
+    async addReply(
+        messageId: string,
+        senderId: string,
+        senderName: string,
+        message: string
+    ): Promise<InboxMessageDocument | null> {
+        if (!mongoose.Types.ObjectId.isValid(messageId) || !mongoose.Types.ObjectId.isValid(senderId)) {
+            throw new Error("Invalid IDs");
+        }
+
+        return this.model.findByIdAndUpdate(
+            messageId,
+            {
+                $push: {
+                    replies: {
+                        senderId: new mongoose.Types.ObjectId(senderId),
+                        senderName,
+                        message,
+                        createdAt: new Date()
+                    }
+                }
+            },
+            { new: true }
+        );
+    }
+
+    /**
+     * Create mention notification for a user
+     */
+    async createMentionNotification(
+        mentionedUserId: string,
+        taskId: string,
+        taskName: string,
+        mentionerName: string,
+        mentionerUserId: string
+    ): Promise<InboxMessageDocument> {
+        if (!mongoose.Types.ObjectId.isValid(mentionedUserId) || !mongoose.Types.ObjectId.isValid(taskId)) {
+            throw new Error("Invalid IDs");
+        }
+
+        const mentionNotification = new this.model({
+            recipientId: new mongoose.Types.ObjectId(mentionedUserId),
+            senderId: new mongoose.Types.ObjectId(mentionerUserId),
+            taskId: new mongoose.Types.ObjectId(taskId),
+            taskName,
+            type: "mention",
+            title: "You were mentioned",
+            message: `${mentionerName} mentioned you in task "${taskName}"`,
+            isRead: false,
+            createdAt: new Date(),
+        });
+        return mentionNotification.save();
     }
 }
