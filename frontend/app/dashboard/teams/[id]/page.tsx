@@ -507,9 +507,9 @@ export default function TeamDetailPage() {
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold">{team.teamName}</h1>
             {team.isPrivate ? (
-              <Lock className="w-5 h-5 text-red-500" title="Private Team" />
+              <Lock className="w-5 h-5 text-red-500" aria-label="Private Team" />
             ) : (
-              <Globe className="w-5 h-5 text-green-500" title="Public Team" />
+              <Globe className="w-5 h-5 text-green-500" aria-label="Public Team" />
             )}
           </div>
         </div>
