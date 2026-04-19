@@ -287,4 +287,40 @@ export class UsersService {
             message: "Profile updated successfully",
         };
     }
+
+    /**
+     * Search users by email (for adding team members)
+     */
+    async searchUsers(searchEmail: string): Promise<any> {
+        const db = mongoose.connection.db;
+        if (!db) {
+            throw new InternalServerError("Database connection failed");
+        }
+
+        if (typeof searchEmail !== "string" || searchEmail.trim().length === 0) {
+            throw new BadRequestError("Search email is required");
+        }
+
+        // Case-insensitive email search with regex
+        const searchPattern = searchEmail.trim();
+        const users = await db
+            .collection("users")
+            .find(
+                {
+                    email: { $regex: `^${searchPattern}`, $options: "i" },
+                },
+                { projection: { _id: 1, firstName: 1, lastName: 1, email: 1 }, limit: 10 }
+            )
+            .toArray();
+
+        return {
+            success: true,
+            data: users.map((user: any) => ({
+                userId: user._id.toString(),
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+            })),
+        };
+    }
 }

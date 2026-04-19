@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSocket } from '../providers/SocketProvider';
 import { inboxApi, InboxMessage } from '../../src/api/inbox.api';
+import axios from 'axios';
 
 export function useNotifications() {
   const { socket, isConnected } = useSocket();
@@ -15,12 +16,26 @@ export function useNotifications() {
 
   const loadNotifications = useCallback(async () => {
     try {
+      // Check if user is authenticated (token exists)
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       const response = await inboxApi.getMessages(50, 0);
       setNotifications(response.messages);
       setUnreadCount(response.unreadCount);
     } catch (error) {
-      console.error('Error loading notifications:', error);
+      // Silently handle 401 errors (user not authenticated)
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        console.info('User not authenticated, skipping notifications load');
+        setNotifications([]);
+        setUnreadCount(0);
+      } else {
+        console.error('Error loading notifications:', error);
+      }
     } finally {
       setLoading(false);
     }

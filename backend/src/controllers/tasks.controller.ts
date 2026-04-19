@@ -180,4 +180,61 @@ export class TasksController {
       }
     }
   }
+
+  async updateTask(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      const { id } = req.params;
+      const body = req.body;
+
+      const result = await this.tasksService.updateTask(id, body, userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Update task error:", error);
+      if (error instanceof Error) {
+        if (error.message.includes("not found") || error.message.includes("Invalid")) {
+          res.status(404).json({ error: error.message });
+        } else if (error.message.includes("admin") || error.message.includes("Access")) {
+          res.status(403).json({ error: error.message });
+        } else {
+          res.status(400).json({ error: error.message });
+        }
+      } else {
+        res.status(500).json({ error: "Server error" });
+      }
+    }
+  }
+
+  async deleteTask(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      const { id } = req.params;
+
+      const result = await this.tasksService.deleteTask(id, userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Delete task error:", error);
+      if (error instanceof Error) {
+        if (error.message.includes("not found") || error.message.includes("Invalid")) {
+          res.status(404).json({ error: error.message });
+        } else if (error.message.includes("admin") || error.message.includes("Access")) {
+          res.status(403).json({ error: error.message });
+        } else {
+          res.status(400).json({ error: error.message });
+        }
+      } else {
+        res.status(500).json({ error: "Server error" });
+      }
+    }
+  }
 }

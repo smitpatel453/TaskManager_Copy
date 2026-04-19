@@ -31,4 +31,16 @@ export const tasksApi = {
     const response = await api.patch(`/tasks/${taskId}/status`, { status });
     return response.data;
   },
+
+  // Update task (admin only)
+  updateTask: async (taskId: string, data: { taskName?: string; hours?: number; startDate?: string; dueDate?: string; status?: string; assignedTo?: string; projectId?: string }) => {
+    const response = await api.patch(`/tasks/${taskId}`, data);
+    return response.data;
+  },
+
+  // Delete task (admin only)
+  deleteTask: async (taskId: string) => {
+    const response = await api.delete(`/tasks/${taskId}`);
+    return response.data;
+  },
 };

@@ -10,17 +10,24 @@ import type { CreateTaskRequest, DetailBlock, TaskStatus } from "../../../src/ty
 type AddTaskFormProps = {
   onAdded?: () => void | Promise<void>;
   queryClient?: ReturnType<typeof useQueryClient>;
+  currentFilter?: string;
+  isAdmin?: boolean | null;
 };
 
 const makeDetail = (): DetailBlock => ({ text: "", hours: 0, minutes: 0 });
 
-export default function AddTaskForm({ onAdded, queryClient: qc }: AddTaskFormProps) {
+export default function AddTaskForm({ onAdded, queryClient: qc, currentFilter = "", isAdmin: isAdminProp }: AddTaskFormProps) {
   const defaultQueryClient = useQueryClient();
   const queryClient = qc || defaultQueryClient;
   const [open, setOpen] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
 
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(isAdminProp ?? false);
   useEffect(() => {
+    if (isAdminProp !== undefined && isAdminProp !== null) {
+      setIsAdmin(isAdminProp);
+      return;
+    }
     const userStr = localStorage.getItem("user");
     if (userStr) {
       try {
@@ -211,6 +218,34 @@ export default function AddTaskForm({ onAdded, queryClient: qc }: AddTaskFormPro
           { ok: true, details: data.task.details }
         );
       }
+
+      // Determine if task is visible in current filter
+      let isVisibleInCurrentFilter = true;
+      if (currentFilter === "created") {
+        // "Personal List" - only shows tasks created by user
+        isVisibleInCurrentFilter = !isAdmin || !assignedTo;
+      } else if (currentFilter === "assigned") {
+        // "Assigned to me" - only shows tasks assigned to user
+        if (isAdmin) {
+          // Admin: task is visible if assigned to themselves
+          isVisibleInCurrentFilter = assignedTo === "" || !assignedTo;
+        } else {
+          // Employee: always assigned to themselves, so always visible
+          isVisibleInCurrentFilter = true;
+        }
+      }
+      // "All Tasks" (currentFilter === "") - always visible
+
+      // Show appropriate toast
+      setToast({
+        message: isVisibleInCurrentFilter 
+          ? "Task created successfully" 
+          : "This task is not visible in current view",
+        type: isVisibleInCurrentFilter ? "success" : "warning"
+      });
+
+      // Auto-hide toast after 3 seconds
+      setTimeout(() => setToast(null), 3000);
 
       setTaskName("");
       setHours(0);
@@ -546,6 +581,15 @@ export default function AddTaskForm({ onAdded, queryClient: qc }: AddTaskFormPro
           </div>
         </div>
       ) : null}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 animate-toast-in" role="alert">
+          <div className={`px-4 py-3 rounded-lg text-[12px] font-medium text-white shadow-lg ${toast.type === 'success' ? 'bg-emerald-950' : 'bg-amber-900'}`}>
+            {toast.message}
+          </div>
+        </div>
+      )}
     </>
   );
 }

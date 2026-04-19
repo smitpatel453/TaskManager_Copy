@@ -97,11 +97,6 @@ export class TasksService {
       throw new Error("Assigned user not found");
     }
 
-    // If admin and assignedTo is provided, they cannot assign to themselves
-    if (isAdmin && assignedToUser === userId) {
-      throw new Error("Admins cannot assign tasks to themselves");
-    }
-
     // Regular users can only assign to themselves
     if (!isAdmin && assignedToUser !== userId) {
       throw new Error("You can only assign tasks to yourself");
@@ -397,5 +392,112 @@ export class TasksService {
     }
 
     return { success: true, message: "Task status updated successfully", status };
+  }
+
+  /**
+   * Update task (admin only)
+   */
+  async updateTask(taskId: string, data: any, userId: string): Promise<any> {
+    // Check if user is admin
+    const isAdmin = await this.isUserAdmin(userId);
+    if (!isAdmin) {
+      throw new Error("Only admins can update tasks");
+    }
+
+    if (!taskId || !mongoose.Types.ObjectId.isValid(taskId)) {
+      throw new Error("Invalid task ID");
+    }
+
+    const task = await TaskModel.findById(new mongoose.Types.ObjectId(taskId));
+    if (!task) {
+      throw new Error("Task not found");
+    }
+
+    // Build update object
+    const updateData: any = {};
+
+    if (data.taskName !== undefined) {
+      if (typeof data.taskName !== "string" || data.taskName.trim().length === 0) {
+        throw new Error("Task name must be a non-empty string");
+      }
+      updateData.taskName = data.taskName;
+    }
+
+    if (data.hours !== undefined) {
+      if (typeof data.hours !== "number" || data.hours < 0) {
+        throw new Error("Hours must be a non-negative number");
+      }
+      updateData.hours = data.hours;
+    }
+
+    if (data.startDate !== undefined) {
+      updateData.startDate = data.startDate ? new Date(data.startDate) : null;
+    }
+
+    if (data.dueDate !== undefined) {
+      updateData.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+    }
+
+    if (data.status !== undefined) {
+      if (!["to-do", "in-progress", "completed"].includes(data.status)) {
+        throw new Error("Invalid status");
+      }
+      updateData.status = data.status;
+    }
+
+    if (data.assignedTo !== undefined) {
+      if (data.assignedTo && !mongoose.Types.ObjectId.isValid(data.assignedTo)) {
+        throw new Error("Invalid assignedTo user ID");
+      }
+      updateData.assignedTo = data.assignedTo ? new mongoose.Types.ObjectId(data.assignedTo) : null;
+    }
+
+    if (data.projectId !== undefined) {
+      if (data.projectId && !mongoose.Types.ObjectId.isValid(data.projectId)) {
+        throw new Error("Invalid project ID");
+      }
+      updateData.projectId = data.projectId ? new mongoose.Types.ObjectId(data.projectId) : null;
+    }
+
+    updateData.updatedAt = new Date();
+
+    const updatedTask = await TaskModel.findByIdAndUpdate(
+      new mongoose.Types.ObjectId(taskId),
+      updateData,
+      { new: true }
+    );
+
+    return {
+      success: true,
+      data: updatedTask,
+      message: "Task updated successfully",
+    };
+  }
+
+  /**
+   * Delete task (admin only)
+   */
+  async deleteTask(taskId: string, userId: string): Promise<any> {
+    // Check if user is admin
+    const isAdmin = await this.isUserAdmin(userId);
+    if (!isAdmin) {
+      throw new Error("Only admins can delete tasks");
+    }
+
+    if (!taskId || !mongoose.Types.ObjectId.isValid(taskId)) {
+      throw new Error("Invalid task ID");
+    }
+
+    const task = await TaskModel.findById(new mongoose.Types.ObjectId(taskId));
+    if (!task) {
+      throw new Error("Task not found");
+    }
+
+    await TaskModel.findByIdAndDelete(new mongoose.Types.ObjectId(taskId));
+
+    return {
+      success: true,
+      message: "Task deleted successfully",
+    };
   }
 }

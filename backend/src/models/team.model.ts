@@ -80,4 +80,27 @@ export class TeamModel {
             .populate("createdBy", "firstName lastName email")
             .sort({ createdAt: -1 });
     }
+
+    async findByIdAndUpdate(teamId: string, updates: any): Promise<TeamDocument | null> {
+        if (!mongoose.Types.ObjectId.isValid(teamId)) return null;
+        return this.model
+            .findByIdAndUpdate(teamId, updates, { new: true })
+            .populate("members", "firstName lastName email")
+            .populate("createdBy", "firstName lastName email");
+    }
+
+    async addMember(teamId: string, memberId: mongoose.Types.ObjectId): Promise<void> {
+        if (!mongoose.Types.ObjectId.isValid(teamId)) return;
+        await this.model.findByIdAndUpdate(teamId, { $addToSet: { members: memberId } });
+    }
+
+    async removeMember(teamId: string, memberId: mongoose.Types.ObjectId): Promise<void> {
+        if (!mongoose.Types.ObjectId.isValid(teamId)) return;
+        await this.model.findByIdAndUpdate(teamId, { $pull: { members: memberId } });
+    }
+
+    async deleteById(teamId: string): Promise<void> {
+        if (!mongoose.Types.ObjectId.isValid(teamId)) return;
+        await this.model.deleteOne({ _id: new mongoose.Types.ObjectId(teamId) });
+    }
 }

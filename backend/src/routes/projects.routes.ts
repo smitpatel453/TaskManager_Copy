@@ -55,6 +55,8 @@ router.post("/", (req, res) => projectsController.createProject(req, res));
 
 // Admin only routes
 router.get("/", adminMiddleware, (req, res) => projectsController.getAllProjects(req, res));
+router.patch("/:id", adminMiddleware, (req, res) => projectsController.updateProject(req, res));
+router.delete("/:id", adminMiddleware, (req, res) => projectsController.deleteProject(req, res));
 
 export default router;
 

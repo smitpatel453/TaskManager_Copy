@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 
 import TaskTable from "./TaskTable";
 import AddTaskForm from "./AddTaskForm";
@@ -16,11 +16,20 @@ export default function TasksClient() {
   const [refreshKey, setRefreshKey] = useState(0);
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const handleTaskAdded = () => {
     // Refresh task list by invalidating cache
     queryClient.invalidateQueries({ queryKey: ["tasks"] });
     setRefreshKey(k => k + 1);
+  };
+
+  const handleFilterChange = (filterValue: string) => {
+    if (filterValue === "all") {
+      router.push("/dashboard/tasks");
+    } else {
+      router.push(`/dashboard/tasks?filter=${filterValue}`);
+    }
   };
 
   const filterParam = useMemo(() => searchParams.get("filter") || "", [searchParams]);
@@ -123,8 +132,30 @@ export default function TasksClient() {
             <span className="font-semibold text-[var(--text-primary)] text-[13px] sm:text-[16px]">{getBreadcrumbLabel()}</span>
           </div>
           <div className="flex-shrink-0">
-            <AddTaskForm onAdded={handleTaskAdded} />
+            <AddTaskForm onAdded={handleTaskAdded} currentFilter={filterParam} isAdmin={isAdmin} />
           </div>
+        </div>
+
+        {/* Task Filter Tabs */}
+        <div className="flex items-center gap-3 sm:gap-6 mt-4 overflow-x-auto border-b border-[var(--border-subtle)]">
+          <button
+            onClick={() => handleFilterChange("all")}
+            className={`pb-3 text-[12px] sm:text-[13px] font-medium border-b-2 flex items-center gap-1.5 sm:gap-2 transition-colors whitespace-nowrap ${!filterParam ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+          >
+            All Tasks
+          </button>
+          <button
+            onClick={() => handleFilterChange("assigned")}
+            className={`pb-3 text-[12px] sm:text-[13px] font-medium border-b-2 flex items-center gap-1.5 sm:gap-2 transition-colors whitespace-nowrap ${filterParam === "assigned" ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+          >
+            Assigned to me
+          </button>
+          <button
+            onClick={() => handleFilterChange("created")}
+            className={`pb-3 text-[12px] sm:text-[13px] font-medium border-b-2 flex items-center gap-1.5 sm:gap-2 transition-colors whitespace-nowrap ${filterParam === "created" ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+          >
+            Personal List
+          </button>
         </div>
 
         {/* View Nav Tabs */}

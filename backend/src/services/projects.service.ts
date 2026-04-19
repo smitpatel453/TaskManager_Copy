@@ -236,5 +236,114 @@ export class ProjectsService {
             throw new Error("Failed to fetch users");
         }
     }
+
+    /**
+     * Update project (admin only)
+     */
+    async updateProject(projectId: string, userId: string, data: any): Promise<any> {
+        const isAdmin = await this.isUserAdmin(userId);
+        if (!isAdmin) {
+            throw new Error("Only admins can update projects");
+        }
+
+        if (!projectId || !mongoose.Types.ObjectId.isValid(projectId)) {
+            throw new Error("Valid project ID is required");
+        }
+
+        const project = await this.projectModel.findById(projectId);
+        if (!project) {
+            throw new Error("Project not found");
+        }
+
+        // Build update object
+        const updateData: any = {};
+
+        if (data.projectName !== undefined) {
+            if (typeof data.projectName !== "string" || data.projectName.trim().length === 0) {
+                throw new Error("Project name must be a non-empty string");
+            }
+            updateData.projectName = data.projectName;
+        }
+
+        if (data.projectDescription !== undefined) {
+            if (typeof data.projectDescription !== "string" || data.projectDescription.trim().length === 0) {
+                throw new Error("Project description must be a non-empty string");
+            }
+            updateData.projectDescription = data.projectDescription;
+        }
+
+        if (data.assignedUsers !== undefined) {
+            if (!Array.isArray(data.assignedUsers) || data.assignedUsers.length === 0) {
+                throw new Error("At least one user must be assigned");
+            }
+            await this.validateAssignedUsers(data.assignedUsers);
+            updateData.assignedUsers = data.assignedUsers.map((id: string) => new mongoose.Types.ObjectId(id));
+        }
+
+        if (data.teamId !== undefined) {
+            if (!mongoose.Types.ObjectId.isValid(data.teamId)) {
+                throw new Error("Valid teamId is required");
+            }
+            const team = await this.teamModel.findById(data.teamId);
+            if (!team) {
+                throw new Error("Selected team does not exist");
+            }
+            updateData.team = new mongoose.Types.ObjectId(data.teamId);
+        }
+
+        updateData.updatedAt = new Date();
+
+        const db = mongoose.connection.db;
+        if (!db) {
+            throw new Error("Database connection failed");
+        }
+
+        const result = await db.collection("projects").findOneAndUpdate(
+            { _id: new mongoose.Types.ObjectId(projectId) },
+            { $set: updateData },
+            { returnDocument: "after" }
+        );
+
+        if (!result) {
+            throw new Error("Failed to update project");
+        }
+
+        return {
+            success: true,
+            data: result,
+            message: "Project updated successfully",
+        };
+    }
+
+    /**
+     * Delete project (admin only)
+     */
+    async deleteProject(projectId: string, userId: string): Promise<any> {
+        const isAdmin = await this.isUserAdmin(userId);
+        if (!isAdmin) {
+            throw new Error("Only admins can delete projects");
+        }
+
+        if (!projectId || !mongoose.Types.ObjectId.isValid(projectId)) {
+            throw new Error("Valid project ID is required");
+        }
+
+        const project = await this.projectModel.findById(projectId);
+        if (!project) {
+            throw new Error("Project not found");
+        }
+
+        const db = mongoose.connection.db;
+        if (!db) {
+            throw new Error("Database connection failed");
+        }
+
+        await db.collection("projects").deleteOne({ _id: new mongoose.Types.ObjectId(projectId) });
+
+        return {
+            success: true,
+            message: "Project deleted successfully",
+        };
+    }
 }
 

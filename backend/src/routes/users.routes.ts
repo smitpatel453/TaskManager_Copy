@@ -51,6 +51,15 @@ async function adminMiddleware(req: Request, res: Response, next: NextFunction):
 // Apply auth middleware to all routes
 router.use(authMiddleware);
 
+// Search users by email (for adding team members)
+router.get("/search", async (req, res, next) => {
+    try {
+        await usersController.searchUsers(req, res);
+    } catch (error) {
+        next(error);
+    }
+});
+
 // User self-update profile
 router.patch("/profile", async (req, res, next) => {
     try {

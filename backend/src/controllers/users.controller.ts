@@ -172,4 +172,33 @@ export class UsersController {
             }
         }
     }
+
+    /**
+     * Search users by email (for adding team members)
+     */
+    async searchUsers(req: Request, res: Response): Promise<void> {
+        try {
+            const userId = req.user?.userId;
+            if (!userId) {
+                res.status(401).json({ error: "Unauthorized" });
+                return;
+            }
+
+            const { email } = req.query;
+            if (!email || typeof email !== "string") {
+                res.status(400).json({ error: "email query parameter is required" });
+                return;
+            }
+
+            const result = await this.usersService.searchUsers(email);
+            res.json(result);
+        } catch (error) {
+            console.error("Search users error:", error);
+            if (error instanceof Error) {
+                res.status(500).json({ error: error.message });
+            } else {
+                res.status(500).json({ error: "Server error" });
+            }
+        }
+    }
 }

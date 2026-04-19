@@ -135,5 +135,77 @@ export class ProjectsController {
             }
         }
     }
+
+    /**
+     * Update project (admin only)
+     */
+    async updateProject(req: Request, res: Response): Promise<void> {
+        try {
+            const userId = req.user?.userId;
+            if (!userId) {
+                res.status(401).json({ error: "Unauthorized" });
+                return;
+            }
+
+            const projectId = req.params.id;
+            if (!projectId) {
+                res.status(400).json({ error: "Project ID is required" });
+                return;
+            }
+
+            const body = req.body;
+
+            const result = await this.projectsService.updateProject(projectId, userId, body);
+            res.json(result);
+        } catch (error) {
+            console.error("Update project error:", error);
+            if (error instanceof Error) {
+                if (error.message.includes("admin") || error.message.includes("Access denied")) {
+                    res.status(403).json({ error: error.message });
+                } else if (error.message.includes("not found")) {
+                    res.status(404).json({ error: error.message });
+                } else {
+                    res.status(400).json({ error: error.message });
+                }
+            } else {
+                res.status(500).json({ error: "Server error" });
+            }
+        }
+    }
+
+    /**
+     * Delete project (admin only)
+     */
+    async deleteProject(req: Request, res: Response): Promise<void> {
+        try {
+            const userId = req.user?.userId;
+            if (!userId) {
+                res.status(401).json({ error: "Unauthorized" });
+                return;
+            }
+
+            const projectId = req.params.id;
+            if (!projectId) {
+                res.status(400).json({ error: "Project ID is required" });
+                return;
+            }
+
+            const result = await this.projectsService.deleteProject(projectId, userId);
+            res.json(result);
+        } catch (error) {
+            console.error("Delete project error:", error);
+            if (error instanceof Error) {
+                if (error.message.includes("admin") || error.message.includes("Access denied")) {
+                    res.status(403).json({ error: error.message });
+                } else if (error.message.includes("not found")) {
+                    res.status(404).json({ error: error.message });
+                } else {
+                    res.status(400).json({ error: error.message });
+                }
+            } else {
+                res.status(500).json({ error: "Server error" });
+            }
+        }
+    }
 }
 

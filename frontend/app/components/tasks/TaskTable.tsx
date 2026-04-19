@@ -1710,6 +1710,20 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId, formatDueDate, isDue
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Admin edit/delete state
+  const [isEditingTask, setIsEditingTask] = useState(false);
+  const [editTaskName, setEditTaskName] = useState(task.taskName);
+  const [editTaskHours, setEditTaskHours] = useState(String(task.hours || ""));
+  const [editTaskStatus, setEditTaskStatus] = useState<"to-do" | "in-progress" | "completed">(task.status || "to-do");
+  const [editTaskDueDate, setEditTaskDueDate] = useState(task.dueDate || "");
+  const [editTaskProject, setEditTaskProject] = useState(task.projectId || "");
+  const [editTaskAssignee, setEditTaskAssignee] = useState(task.assignedTo || "");
+  const [isUpdatingTask, setIsUpdatingTask] = useState(false);
+  const [taskUpdateError, setTaskUpdateError] = useState("");
+  const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
   // Click-outside handler for status dropdown
   useEffect(() => {
     if (!statusDropdownOpen) return;
@@ -1816,6 +1830,48 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId, formatDueDate, isDue
     }
   };
 
+  const handleUpdateTask = async () => {
+    if (!editTaskName.trim()) {
+      setTaskUpdateError("Task name is required");
+      return;
+    }
+
+    setIsUpdatingTask(true);
+    setTaskUpdateError("");
+    try {
+      await tasksApi.updateTask(task._id, {
+        taskName: editTaskName,
+        hours: parseFloat(editTaskHours) || 0,
+        status: editTaskStatus,
+        dueDate: editTaskDueDate || undefined,
+        projectId: editTaskProject || undefined,
+        assignedTo: editTaskAssignee || undefined,
+      });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      setIsEditingTask(false);
+    } catch (error: any) {
+      const message = error?.response?.data?.error || error?.message || "Failed to update task";
+      setTaskUpdateError(message);
+    } finally {
+      setIsUpdatingTask(false);
+    }
+  };
+
+  const handleDeleteTask = async () => {
+    setIsDeleting(true);
+    setDeleteError("");
+    try {
+      await tasksApi.deleteTask(task._id);
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      setIsDeleteConfirming(false);
+    } catch (error: any) {
+      const message = error?.response?.data?.error || error?.message || "Failed to delete task";
+      setDeleteError(message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const overdue = isDueDateOverdue(task.dueDate) && task.status !== "completed";
   const dueDateStr = formatDueDate(task.dueDate);
 
@@ -1917,8 +1973,36 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId, formatDueDate, isDue
         </div>
 
         {/* Actions */}
-        <div className="flex justify-center text-[var(--text-muted)] opacity-0 group-hover:opacity-100 hover:text-[var(--text-secondary)] cursor-pointer transition-all text-lg">
-          ···
+        <div className="flex justify-center items-center gap-1">
+          {isAdmin && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsEditingTask(true);
+                }}
+                className="p-1 text-[var(--text-muted)] hover:text-blue-500 transition-colors opacity-0 group-hover:opacity-100"
+                title="Edit task"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsDeleteConfirming(true);
+                }}
+                className="p-1 text-[var(--text-muted)] hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                title="Delete task"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>
+              </button>
+            </>
+          )}
+          {!isAdmin && (
+            <div className="flex justify-center text-[var(--text-muted)] opacity-0 group-hover:opacity-100 hover:text-[var(--text-secondary)] cursor-pointer transition-all text-lg">
+              ···
+            </div>
+          )}
         </div>
       </div>
 
@@ -2066,6 +2150,106 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId, formatDueDate, isDue
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Task Modal */}
+      {isEditingTask && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-[var(--bg-canvas)] rounded-lg border border-[var(--border-subtle)] shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-fade-in">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
+              <h2 className="text-[16px] font-semibold text-[var(--text-primary)] flex items-center gap-2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                Edit Task
+              </h2>
+              <button onClick={() => { setIsEditingTask(false); setTaskUpdateError(""); }} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wider block mb-2">Task Name</label>
+                <input type="text" value={editTaskName} onChange={(e) => setEditTaskName(e.target.value)} className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-md px-3 py-2 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Task name" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wider block mb-2">Hours</label>
+                  <input type="number" value={editTaskHours} onChange={(e) => setEditTaskHours(e.target.value)} step="0.5" min="0" className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-md px-3 py-2 text-[13px] text-[var(--text-primary)]" placeholder="0" />
+                </div>
+                <div>
+                  <label className="text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wider block mb-2">Status</label>
+                  <select value={editTaskStatus} onChange={(e) => setEditTaskStatus(e.target.value as any)} className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-md px-3 py-2 text-[13px] text-[var(--text-primary)]">
+                    <option value="to-do">TO DO</option>
+                    <option value="in-progress">IN PROGRESS</option>
+                    <option value="completed">COMPLETED</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wider block mb-2">Due Date</label>
+                <input type="date" value={editTaskDueDate ? editTaskDueDate.split('T')[0] : ""} onChange={(e) => setEditTaskDueDate(e.target.value)} className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-md px-3 py-2 text-[13px]" />
+              </div>
+
+              <div>
+                <label className="text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wider block mb-2">Project</label>
+                <select value={editTaskProject} onChange={(e) => setEditTaskProject(e.target.value)} className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-md px-3 py-2 text-[13px] text-[var(--text-primary)]">
+                  <option value="">None</option>
+                  {projects?.map(p => <option key={p._id} value={p._id}>{p.projectName}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wider block mb-2">Assign To</label>
+                <select value={editTaskAssignee} onChange={(e) => setEditTaskAssignee(e.target.value)} className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-md px-3 py-2 text-[13px] text-[var(--text-primary)]">
+                  <option value="">Unassigned</option>
+                  {users?.map(u => <option key={u._id} value={u._id}>{u.firstName} {u.lastName}</option>)}
+                </select>
+              </div>
+
+              {taskUpdateError && <div className="text-[12px] text-red-600 font-medium bg-red-50 p-2 rounded border border-red-200">{taskUpdateError}</div>}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border-subtle)] bg-[var(--bg-surface-2)]">
+              <button onClick={() => { setIsEditingTask(false); setTaskUpdateError(""); }} className="px-4 py-2 text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] rounded-md transition-colors">Cancel</button>
+              <button onClick={handleUpdateTask} disabled={isUpdatingTask} className="px-4 py-2 text-[12px] font-medium text-white bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 rounded-md transition-colors">{isUpdatingTask ? "Updating..." : "Save Changes"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Task Confirmation Modal */}
+      {isDeleteConfirming && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-[var(--bg-canvas)] rounded-lg border border-[var(--border-subtle)] shadow-xl max-w-sm w-full animate-fade-in">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
+              <h2 className="text-[16px] font-semibold text-[var(--text-primary)] flex items-center gap-2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-600"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                Delete Task
+              </h2>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <p className="text-[13px] text-[var(--text-secondary)] mb-2">Are you sure you want to delete this task? This action cannot be undone.</p>
+              <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2 mt-4">
+                <p className="text-[12px] font-semibold text-red-700">{task.taskName}</p>
+              </div>
+              {deleteError && <div className="text-[12px] text-red-600 font-medium bg-red-50 p-2 rounded border border-red-200 mt-3">{deleteError}</div>}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border-subtle)] bg-[var(--bg-surface-2)]">
+              <button onClick={() => { setIsDeleteConfirming(false); setDeleteError(""); }} className="px-4 py-2 text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] rounded-md transition-colors">Cancel</button>
+              <button onClick={handleDeleteTask} disabled={isDeleting} className="px-4 py-2 text-[12px] font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-400 rounded-md transition-colors">{isDeleting ? "Deleting..." : "Delete Task"}</button>
             </div>
           </div>
         </div>

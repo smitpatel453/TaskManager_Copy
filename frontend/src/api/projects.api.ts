@@ -25,4 +25,16 @@ export const projectsApi = {
     const response = await api.get("/projects/users/all");
     return response.data;
   },
+
+  // Update project (admin only)
+  updateProject: async (projectId: string, data: { projectName: string; projectDescription: string; assignedUsers: string[] }) => {
+    const response = await api.patch(`/projects/${projectId}`, data);
+    return response.data;
+  },
+
+  // Delete project (admin only)
+  deleteProject: async (projectId: string) => {
+    const response = await api.delete(`/projects/${projectId}`);
+    return response.data;
+  },
 };

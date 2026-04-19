@@ -120,10 +120,9 @@ export class TaskModel {
         if (filter === "created") {
             matchCondition = { userId: userObjectId };
         } else if (filter === "assigned") {
-            // Only tasks assigned to user by someone else (not self-created)
+            // Tasks assigned to user (including self-created tasks)
             matchCondition = {
-                assignedTo: userObjectId,
-                userId: { $ne: userObjectId }
+                assignedTo: userObjectId
             };
         } else {
             // "all" - tasks where user is either the creator OR the assignee
@@ -206,11 +205,10 @@ export class TaskModel {
         if (userId && filter === "created") {
             matchCondition = { userId: new mongoose.Types.ObjectId(userId) };
         } else if (userId && filter === "assigned") {
-            // Only tasks assigned to admin by someone else (not self-created)
+            // Tasks assigned to admin (including self-created tasks)
             const adminObjectId = new mongoose.Types.ObjectId(userId);
             matchCondition = {
-                assignedTo: adminObjectId,
-                userId: { $ne: adminObjectId }
+                assignedTo: adminObjectId
             };
         }
         // "all" - no filtering

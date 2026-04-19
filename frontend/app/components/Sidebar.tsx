@@ -523,7 +523,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
         })}
 
         {/* Employee Nav Items (My Teams, Projects) */}
-        {employeeNavItems.map((item) => {
+        {employeeNavItems.filter(item => item.id !== "my-teams").map((item) => {
           const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
           return (
             <NavItem key={item.id} icon={item.icon} label={item.label} active={isActive} isCollapsed={isCollapsed}
@@ -538,15 +538,6 @@ export default function Sidebar({ userRole }: SidebarProps) {
             <SectionHeader label="Teams" onAdd={isAdmin ? openTeamModal : undefined} onToggle={() => setTeamsOpen(v => !v)} isOpen={teamsOpen} isCollapsed={isCollapsed} />
             {teamsOpen && !isCollapsed && (
               <div className="space-y-0.5 mt-1">
-                {/* All People */}
-                <NavItem 
-                  icon="pi pi-user" 
-                  label="All People" 
-                  badge={teamUsers.length || undefined}
-                  active={pathname === "/dashboard/teams/members"}
-                  onClick={() => { navigateTo("/dashboard/teams/members"); onClose?.(); }}
-                />
-                
                 {/* Analytics */}
                 <NavItem 
                   icon="pi pi-chart-bar" 
