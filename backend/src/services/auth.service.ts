@@ -53,6 +53,58 @@ export class AuthService {
     };
   }
 
+  async signup(
+    firstName: string,
+    lastName: string,
+    email: string,
+    password: string
+  ): Promise<AuthResponse> {
+    // Validate input
+    if (!firstName || !lastName || !email || !password) {
+      throw new Error("First name, last name, email, and password are required");
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check if user already exists
+    const existingUser = await this.userModel.findByEmail(normalizedEmail);
+    if (existingUser) {
+      throw new Error("Email already registered");
+    }
+
+    // Hash password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Create new user with default role "user"
+    const { user: newUser } = await this.userModel.create({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: normalizedEmail,
+      password: hashedPassword,
+      role: "user",
+      emailVerified: false,
+    });
+
+    // Generate JWT token
+    const token = await generateToken(newUser._id!.toString(), newUser.email);
+
+    return {
+      success: true,
+      message: "Signup successful",
+      data: {
+        token,
+        userId: newUser._id!.toString(),
+        email: newUser.email,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        role: "user",
+        avatar: newUser.avatar,
+        emailVerified: false,
+      },
+    };
+  }
+
   async verifyEmail(token: string): Promise<{ success: boolean; message: string }> {
     if (!token || typeof token !== "string") {
       throw new Error("Verification token is required");

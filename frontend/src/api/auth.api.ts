@@ -7,6 +7,17 @@ export const authApi = {
     return response.data;
   },
 
+  signup: async (firstName: string, lastName: string, email: string, password: string, confirmPassword: string) => {
+    const response = await api.post<AuthResponse>("/auth/signup", { 
+      firstName, 
+      lastName, 
+      email, 
+      password,
+      confirmPassword
+    });
+    return response.data;
+  },
+
   verifyEmail: async (token: string) => {
     const response = await api.get<{ success: boolean; message: string }>("/auth/verify-email", {
       params: { token },

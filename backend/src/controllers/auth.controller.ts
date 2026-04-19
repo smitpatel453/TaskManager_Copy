@@ -24,6 +24,75 @@ export class AuthController {
     }
   }
 
+  async signup(req: Request, res: Response): Promise<void> {
+    try {
+      const body = req.body as {
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+        password?: string;
+        confirmPassword?: string;
+      };
+
+      // Validate required fields
+      if (!body.firstName || typeof body.firstName !== "string") {
+        res.status(400).json({ error: "First name is required" });
+        return;
+      }
+
+      if (!body.lastName || typeof body.lastName !== "string") {
+        res.status(400).json({ error: "Last name is required" });
+        return;
+      }
+
+      if (!body.email || typeof body.email !== "string") {
+        res.status(400).json({ error: "Email is required" });
+        return;
+      }
+
+      if (!body.password || typeof body.password !== "string") {
+        res.status(400).json({ error: "Password is required" });
+        return;
+      }
+
+      if (!body.confirmPassword || typeof body.confirmPassword !== "string") {
+        res.status(400).json({ error: "Confirm password is required" });
+        return;
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(body.email)) {
+        res.status(400).json({ error: "Invalid email format" });
+        return;
+      }
+
+      // Validate passwords match
+      if (body.password !== body.confirmPassword) {
+        res.status(400).json({ error: "Passwords do not match" });
+        return;
+      }
+
+      // Validate password strength
+      if (!isStrongPassword(body.password)) {
+        res.status(400).json({ error: STRONG_PASSWORD_MESSAGE });
+        return;
+      }
+
+      const result = await this.authService.signup(body.firstName, body.lastName, body.email, body.password);
+      res.status(201).json(result);
+    } catch (error) {
+      console.error("Auth signup error:", error);
+      if (error instanceof Error && error.message === "Email already registered") {
+        res.status(409).json({ error: error.message });
+      } else if (error instanceof Error) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Server error" });
+      }
+    }
+  }
+
   async changePassword(req: Request, res: Response): Promise<void> {
     try {
       const userId = (req.user as any)?.userId;
