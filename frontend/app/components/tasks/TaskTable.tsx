@@ -2209,7 +2209,7 @@ function TaskRow({ task, expandedTaskId, setExpandedTaskId, formatDueDate, isDue
                 <label className="text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wider block mb-2">Assign To</label>
                 <select value={editTaskAssignee} onChange={(e) => setEditTaskAssignee(e.target.value)} className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-md px-3 py-2 text-[13px] text-[var(--text-primary)]">
                   <option value="">Unassigned</option>
-                  {users?.map(u => <option key={u._id} value={u._id}>{u.firstName} {u.lastName}</option>)}
+                  {users?.map(u => <option key={u._id} value={u._id}>{u.fullName}</option>)}
                 </select>
               </div>
 
